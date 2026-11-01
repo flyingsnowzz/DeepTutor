@@ -60,6 +60,8 @@ deeptutor/learning/storage_postgres.py      # PostgresMasteryRepository（path/e
 deeptutor/services/jobs/postgres.py         # PostgresJobService（提交即引导 owner 账户）
 deeptutor/services/platform.py              # PlatformDataServices：单一 engine 聚合全部仓储
 deeptutor/services/storage/s3.py            # S3ObjectStore（产物二进制 + 预签名 URL）
+deeptutor_cli/mcp_runner.py                # TurnCapabilityRunner（适配层，调用 DeepTutorApp；
+                                            # 不能放在 services，因为 services 禁止反向依赖 app）
 scripts/migration/sqlite_to_postgres/       # 一次性 ETL
 ```
 

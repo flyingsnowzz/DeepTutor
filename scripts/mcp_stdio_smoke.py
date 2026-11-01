@@ -7,7 +7,6 @@ import asyncio
 import json
 import os
 import sys
-import time
 import uuid
 
 from mcp import ClientSession
@@ -45,10 +44,16 @@ async def main() -> int:
             if missing:
                 raise SystemExit(f"missing tools: {sorted(missing)}")
 
-            submitted = parse(await session.call_tool(
-                "capability_run_submit",
-                {"capability": "visualize", "input": {"prompt": "画学习闭环"}, "idempotency_key": f"smoke-visualize-{uuid.uuid4().hex[:12]}"},
-            ))
+            submitted = parse(
+                await session.call_tool(
+                    "capability_run_submit",
+                    {
+                        "capability": "visualize",
+                        "input": {"prompt": "画学习闭环"},
+                        "idempotency_key": f"smoke-visualize-{uuid.uuid4().hex[:12]}",
+                    },
+                )
+            )
             job_id = submitted["data"]["job_id"]
             print("submitted", job_id, submitted["data"]["status"])
 
@@ -65,9 +70,11 @@ async def main() -> int:
             if final["status"] != "succeeded" or not final["artifacts"]:
                 raise SystemExit("visualize job did not succeed with artifact")
 
-            artifact = parse(await session.call_tool(
-                "artifact_get", {"artifact_ref": final["artifacts"][0]["artifact_ref"]}
-            ))
+            artifact = parse(
+                await session.call_tool(
+                    "artifact_get", {"artifact_ref": final["artifacts"][0]["artifact_ref"]}
+                )
+            )
             print("artifact", artifact["data"]["mime_type"], artifact["data"]["url"])
             return 0
 

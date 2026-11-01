@@ -1,3 +1,49 @@
-from deeptutor.mcp_server.cli import app, main
+from __future__ import annotations
 
-__all__ = ["app", "main"]
+import asyncio
+import os
+
+import typer
+
+app = typer.Typer(
+    name="mcp", help="Serve DeepTutor over Model Context Protocol.", no_args_is_help=True
+)
+
+
+@app.command("serve")
+def serve(
+    transport: str = typer.Option(
+        "stdio", "--transport", help="Transport: stdio (T1); http arrives in T3."
+    ),
+    host: str = typer.Option("127.0.0.1", "--host"),
+    port: int = typer.Option(8001, "--port"),
+) -> None:
+    """Start the external MCP server."""
+    from deeptutor.mcp_server.factory import build_runtime_services
+    from deeptutor.mcp_server.server import create_mcp_server
+
+    from .mcp_runner import TurnCapabilityRunner
+
+    if transport != "stdio":
+        raise typer.BadParameter("T1 supports only --transport stdio; HTTP arrives in T3.")
+    deterministic = os.environ.get("DEEPTUTOR_MCP_DETERMINISTIC", "").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    runner = None if deterministic else TurnCapabilityRunner()
+    jobs, store = build_runtime_services(runner=runner)
+    server = create_mcp_server(
+        owner_user_id="local-dev-user",
+        job_service=jobs,
+        object_store=store,
+    )
+    asyncio.run(server.run_stdio_async())
+
+
+def main() -> None:  # pragma: no cover
+    app(prog_name="deeptutor mcp")
+
+
+if __name__ == "__main__":  # pragma: no cover
+    main()

@@ -17,8 +17,8 @@ from .common import build_turn_request, console, maybe_run
 from .config_cmd import register as register_config
 from .doctor import register as register_doctor
 from .init_cmd import register as register_init
-from .module import register as register_module
 from .mcp import app as mcp_app
+from .module import register as register_module
 from .plugin import register as register_plugin
 from .provider_cmd import register as register_provider
 from .session_cmd import register as register_session

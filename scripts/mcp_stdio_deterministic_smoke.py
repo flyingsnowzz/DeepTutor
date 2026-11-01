@@ -45,10 +45,16 @@ async def main() -> int:
                 raise SystemExit(f"missing tools: {sorted(missing)}")
 
             key = f"ci-visualize-{uuid.uuid4().hex[:12]}"
-            submitted = parse(await session.call_tool(
-                "capability_run_submit",
-                {"capability": "visualize", "input": {"prompt": "画学习闭环"}, "idempotency_key": key},
-            ))
+            submitted = parse(
+                await session.call_tool(
+                    "capability_run_submit",
+                    {
+                        "capability": "visualize",
+                        "input": {"prompt": "画学习闭环"},
+                        "idempotency_key": key,
+                    },
+                )
+            )
             job_id = submitted["data"]["job_id"]
             for _ in range(50):
                 fetched = parse(await session.call_tool("capability_job_get", {"job_id": job_id}))
@@ -60,10 +66,18 @@ async def main() -> int:
                 raise SystemExit("job did not terminate")
             if status != "succeeded" or not fetched["data"]["artifacts"]:
                 raise SystemExit(f"bad terminal job: {fetched}")
-            artifact = parse(await session.call_tool(
-                "artifact_get", {"artifact_ref": fetched["data"]["artifacts"][0]["artifact_ref"]}
-            ))
-            print(json.dumps({"job_id": job_id, "status": status, "artifact": artifact["data"]}, ensure_ascii=False))
+            artifact = parse(
+                await session.call_tool(
+                    "artifact_get",
+                    {"artifact_ref": fetched["data"]["artifacts"][0]["artifact_ref"]},
+                )
+            )
+            print(
+                json.dumps(
+                    {"job_id": job_id, "status": status, "artifact": artifact["data"]},
+                    ensure_ascii=False,
+                )
+            )
             return 0
 
 

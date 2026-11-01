@@ -24,10 +24,16 @@ async def main():
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            submitted = parse(await session.call_tool(
-                "capability_run_submit",
-                {"capability": "deep_research", "input": {"prompt": "研究间隔重复的学习机制"}, "idempotency_key": f"cancel-research-{uuid.uuid4().hex[:12]}"},
-            ))
+            submitted = parse(
+                await session.call_tool(
+                    "capability_run_submit",
+                    {
+                        "capability": "deep_research",
+                        "input": {"prompt": "研究间隔重复的学习机制"},
+                        "idempotency_key": f"cancel-research-{uuid.uuid4().hex[:12]}",
+                    },
+                )
+            )
             job_id = submitted["data"]["job_id"]
             print("submitted", job_id, submitted["data"]["status"])
             await asyncio.sleep(0.5)
@@ -38,5 +44,6 @@ async def main():
             print("final", status)
             if status != "canceled":
                 raise SystemExit(f"expected canceled, got {status}")
+
 
 asyncio.run(main())

@@ -4,8 +4,8 @@ import uuid
 
 import pytest
 
-from deeptutor.services.jobs.runner import CapabilityRunResult
 from deeptutor.services.jobs.postgres import PostgresJobService
+from deeptutor.services.jobs.runner import CapabilityRunResult
 from deeptutor.services.storage.object_store import InMemoryObjectStore
 
 pytestmark = pytest.mark.skipif(not os.environ.get("DATABASE_URL"), reason="DATABASE_URL not set")
@@ -16,14 +16,24 @@ class StaticRunner:
         mermaid = "flowchart LR\nA-->B"
         return CapabilityRunResult(
             result={"render_type": "mermaid"},
-            artifacts=[{
-                "key_suffix": "diagram.mmd",
-                "data": mermaid.encode(),
-                "kind": "visualization_source",
-                "mime_type": "text/vnd.mermaid",
-                "filename": "diagram.mmd",
-            }] if capability == "visualize" else [],
-            usage={"provider": "test", "model": "fake", "prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3},
+            artifacts=[
+                {
+                    "key_suffix": "diagram.mmd",
+                    "data": mermaid.encode(),
+                    "kind": "visualization_source",
+                    "mime_type": "text/vnd.mermaid",
+                    "filename": "diagram.mmd",
+                }
+            ]
+            if capability == "visualize"
+            else [],
+            usage={
+                "provider": "test",
+                "model": "fake",
+                "prompt_tokens": 1,
+                "completion_tokens": 2,
+                "total_tokens": 3,
+            },
         )
 
 
@@ -84,7 +94,9 @@ async def test_postgres_job_cancel():
     owner = f"user-cancel-{uuid.uuid4().hex[:8]}"
     service = PostgresJobService(os.environ["DATABASE_URL"], runner=SlowRunner())
     try:
-        job = await service.submit(owner_user_id=owner, capability="deep_research", payload={"prompt": "slow"})
+        job = await service.submit(
+            owner_user_id=owner, capability="deep_research", payload={"prompt": "slow"}
+        )
         await asyncio.sleep(0.05)
         canceled = await service.cancel(job_id=job.id, owner_user_id=owner)
         assert canceled.status == "canceled"

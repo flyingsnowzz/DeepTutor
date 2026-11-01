@@ -2,7 +2,7 @@
 
 The service owns asynchronous job lifecycle while remaining storage-agnostic.
 T2 introduces the multi-worker production version; T1 tests use the deterministic
-runner and the stdio server uses the real TurnCapabilityRunner by default.
+and the stdio CLI injects the real TurnCapabilityRunner from deeptutor_cli.
 """
 
 from __future__ import annotations

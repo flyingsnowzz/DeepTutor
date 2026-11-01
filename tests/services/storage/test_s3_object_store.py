@@ -18,6 +18,7 @@ def _port_open(host: str, port: int) -> bool:
 @pytest.mark.asyncio
 async def test_s3_put_get_presign():
     from urllib.parse import urlparse
+
     from deeptutor.services.storage.s3 import S3ObjectStore
 
     endpoint = os.environ["S3_ENDPOINT"]
