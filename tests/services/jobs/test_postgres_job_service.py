@@ -4,6 +4,8 @@ import uuid
 
 import pytest
 
+pytest.importorskip("sqlalchemy")
+
 from deeptutor.services.jobs.postgres import PostgresJobService
 from deeptutor.services.jobs.runner import CapabilityRunResult
 from deeptutor.services.storage.object_store import InMemoryObjectStore

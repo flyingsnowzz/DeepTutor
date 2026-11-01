@@ -4,6 +4,8 @@ import socket
 
 import pytest
 
+pytest.importorskip("boto3")
+
 pytestmark = pytest.mark.skipif(os.environ.get("S3_ENDPOINT") is None, reason="S3_ENDPOINT not set")
 
 

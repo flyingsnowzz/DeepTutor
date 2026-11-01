@@ -6,8 +6,16 @@ import uuid
 import pytest
 import pytest_asyncio
 
-from deeptutor.services.accounts.service import AccountService
-from deeptutor.services.postgres.database import create_engine
+# These repositories need SQLAlchemy/asyncpg; in environments without the
+# mcp-server extras (e.g. the main full.txt CI matrix) skip collection instead
+# of erroring on missing third-party imports.
+try:
+    import sqlalchemy  # noqa: F401
+
+    from deeptutor.services.accounts.service import AccountService
+    from deeptutor.services.postgres.database import create_engine
+except ImportError:  # pragma: no cover
+    collect_ignore_glob = ["*.py"]
 
 
 @pytest.fixture(scope="session")
