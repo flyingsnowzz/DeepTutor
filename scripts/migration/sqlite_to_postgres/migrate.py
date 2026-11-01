@@ -571,7 +571,8 @@ async def main_async(args) -> None:
         "sources": summary,
     }
     if args.check and not args.dry_run:
-        report["postgres_counts"] = await postgres_counts(None)
+        # With --owner, reconcile that single account; without it, report totals.
+        report["postgres_counts"] = await postgres_counts(owner)
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
 
