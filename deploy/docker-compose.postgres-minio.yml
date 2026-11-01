@@ -1,0 +1,68 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: deeptutor-mcp-postgres
+    environment:
+      POSTGRES_USER: deeptutor
+      POSTGRES_PASSWORD: deeptutor
+      POSTGRES_DB: deeptutor
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deeptutor -d deeptutor"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - deeptutor_mcp_postgres:/var/lib/postgresql/data
+
+  minio:
+    profiles: ["minio"]
+    image: quay.io/minio/minio:RELEASE.2024-12-18T13-15-44Z
+    container_name: deeptutor-mcp-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: deeptutor
+      MINIO_ROOT_PASSWORD: deeptutor-dev-password
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - deeptutor_mcp_minio:/data
+
+
+  localstack:
+    image: localstack/localstack:4.0
+    container_name: deeptutor-t1-localstack
+    environment:
+      SERVICES: s3
+      DEFAULT_REGION: us-east-1
+    ports:
+      - "4566:4566"
+    volumes:
+      - deeptutor_mcp_localstack:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  redis:
+    image: redis:7-alpine
+    container_name: deeptutor-mcp-redis
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - deeptutor_mcp_redis:/data
+
+volumes:
+  deeptutor_mcp_postgres:
+  deeptutor_mcp_minio:
+  deeptutor_mcp_redis:
+  deeptutor_mcp_localstack:

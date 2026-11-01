@@ -76,6 +76,11 @@ env/
 venv/
 ENV/
 .venv/
+
+# Keep public deploy environment templates, ignore real files
+!deploy/env/
+deploy/env/*
+!deploy/env/*.example.env
 env.bak/
 venv.bak/
 

@@ -1,4 +1,7 @@
-# T2 — 云端多账户 HTTP 服务
+# T3 — 云端多账户 streamable HTTP 服务
+
+> Codex goal-mode target：完成本目标时，必须交付“产出物”中的文件/代码，并按“验收命令”运行测试，留下可审查证据。
+
 
 ## 目标
 
@@ -6,7 +9,8 @@
 
 ## 前置依赖
 
-- T1 本地 stdio 与 Postgres-only 最小闭环通过。
+- T1 本地 stdio 闭环通过。
+- T2 PostgreSQL 多账户存储改造通过。
 
 ## 范围
 
@@ -57,7 +61,7 @@ deeptutor mcp serve --transport http --host 0.0.0.0 --port 8001
 - `owner_user_id`；
 - 套餐/额度上下文。
 
-### 3. Postgres 产品化
+### 3. Postgres 产品化与云端配置
 
 使用托管 Postgres 或等价生产环境：
 
@@ -69,7 +73,7 @@ deeptutor mcp serve --transport http --host 0.0.0.0 --port 8001
 - RLS 作为纵深防御；
 - 应用层强制 owner 谓词。
 
-扩展核心表：
+复用并校验 T2 已建立的核心表：
 
 - `users`
 - `auth_identities`
@@ -90,9 +94,9 @@ deeptutor mcp serve --transport http --host 0.0.0.0 --port 8001
 - 上传/下载大小限制；
 - MIME 类型校验。
 
-### 5. 学习状态能力
+### 5. 学习状态与 P2 能力开放
 
-当 practice/mastery Postgres 仓储就绪后开放：
+在 T2 PostgreSQL 仓储就绪后，开放学习状态工具：
 
 - `practice_summary_get`
 - `practice_queue_list`
@@ -105,26 +109,28 @@ deeptutor mcp serve --transport http --host 0.0.0.0 --port 8001
 - `mastery_map_get`
 - `mastery_objective_get`
 - `review_tasks_list`
+- `mastery_path_generate_*` 与必要的掌握度写操作
 
 要求：
 
 - 每个资源都校验 owner；
 - review 使用幂等 request id；
-- 掌握度更新有证据和事件。
+- 掌握度更新必须有证据和事件；
+- 写操作重复提交不得重复计分。
 
-### 6. 出题能力
+在 T1 的研究、可视化和异步出题基础上，开放方案 P2 能力：
 
-开放异步：
+- `problem_solve_submit/get`：映射 `deep_solve`，分步解题与同类练习；
+- `quiz_judge_submit/get`：主观题/图片题异步判分；
+- `audio_overview_generate_submit/get`：映射 `audio_overview`，生成音频与逐字稿；
+- `quiz_generate_*`：沿用 T1 的异步出题 Job，不做阻塞同步工具。
 
-- `quiz_generate_submit`
-- `quiz_job_get`
+要求：
 
-不做阻塞式同步生成。要求：
-
-- 题目结构稳定；
-- 支持材料引用；
-- 可生成题目 artifact 或结构化题单；
-- 失败可解释。
+- 解题、判分、音频均为 Job，不伪装成同步阻塞工具；
+- 提交前说明成本/耗时（音频和模型调用）；
+- 判分结果仅作为形成性反馈，不代表官方评分；
+- 所有写操作必须幂等并写入 `usage_events`。
 
 ### 7. 套餐、额度与计量
 
@@ -156,12 +162,11 @@ deeptutor mcp serve --transport http --host 0.0.0.0 --port 8001
 - 完整敏感答案（如法律/政策要求需另设计）；
 - provider 凭据。
 
-### 9. 数据迁移与回滚演练
+### 9. 上线与回滚演练
 
-- 旧 SQLite 只作为一次性 ETL 来源；
-- 迁移脚本按目录属主映射用户；
-- 按账户核对数量和校验和；
-- 备份恢复演练；
+- 复用 T2 的 SQLite ETL 和备份恢复能力；
+- 云端使用托管 Postgres（PITR/HA）和对象存储；
+- 准备蓝绿/回滚配置；
 - 新云端运行路径不打开 SQLite。
 
 ## 产出物
@@ -187,8 +192,30 @@ deeptutor mcp serve --transport http --host 0.0.0.0 --port 8001
 - [ ] 关键接口具备限流、审计和 request id。
 - [ ] 至少完成一次真实外部宿主联调。
 
+## Codex 实施任务
+
+1. 在 MCP server 中实现 streamable HTTP `/mcp`，保留 stdio transport。
+2. 接入 OAuth 2.1/Bearer 鉴权，实现 401 + 登录 URL、token 轮换与吊销。
+3. 扩展 Postgres schema：账户、订阅、practice/mastery、quota/usage。
+4. 将 artifact 切换到云端 S3 兼容存储和短期签名 URL。
+5. 实现套餐额度、限流、审计、request id、统一错误格式。
+6. 准备生产部署配置、备份恢复与健康检查文档。
+7. 仅在明确宿主需要时增加 SSE transport，不提前维护无需求兼容层。
+
+## 验收命令/证据
+
+```bash
+DATABASE_URL='postgresql+asyncpg://...' S3_ENDPOINT='...' python -m deeptutor_cli.main mcp serve --transport http --host 0.0.0.0 --port 8001
+curl -i http://127.0.0.1:8001/healthz
+curl -i http://127.0.0.1:8001/mcp
+python -m pytest tests/mcp_server -q -k 'http or oauth or quota or owner or audit'
+```
+
+必须提供：HTTPS 反代配置、401 流程记录、A/B 账户越权测试、Postgres 恢复演练、额度超限测试。
+
 ## 非目标
 
+- 不做 `immersive_reading` 实时会话、Remotion 视频课、Manim 动画（进入 T4）。
 - 不做企业 SSO。
 - 不做组织/席位/团队报表。
 - 不做监考、证书或正式考试认证。

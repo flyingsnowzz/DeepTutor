@@ -351,6 +351,52 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
           DEEPTUTOR_TEST_REDIS_URL: redis://127.0.0.1:6379/0
 
+  postgres-integration:
+    name: PostgreSQL Platform Integration
+    runs-on: ubuntu-24.04
+    needs: import-check
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: deeptutor
+          POSTGRES_PASSWORD: deeptutor
+          POSTGRES_DB: deeptutor
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U deeptutor -d deeptutor"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/full.txt -r requirements/mcp.txt
+          pip install pytest pytest-asyncio
+
+      - name: Migrate database schema
+        env:
+          DATABASE_URL: postgresql+asyncpg://deeptutor:deeptutor@127.0.0.1:5432/deeptutor
+        run: alembic upgrade head
+
+      - name: Run Postgres platform integration tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          DATABASE_URL: postgresql+asyncpg://deeptutor:deeptutor@127.0.0.1:5432/deeptutor
+        run: |
+          pytest -q tests/services/postgres tests/services/jobs             tests/learning/postgres tests/migration tests/mcp_server
+
   video-lesson-sandbox:
     name: Video lesson isolation (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -380,7 +426,7 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-24.04
-    needs: [chat-engine, lint, web-tests, multi-worker-web, import-check, python-tests, video-lesson-sandbox]
+    needs: [chat-engine, lint, web-tests, multi-worker-web, import-check, python-tests, postgres-integration, video-lesson-sandbox]
     if: always()
 
     steps:
@@ -397,7 +443,8 @@ jobs:
           echo "| Four-worker browser acceptance | ${{ needs.multi-worker-web.result == 'success' && '✅ Passed' || needs.multi-worker-web.result == 'skipped' && '⏭️ Fixture not configured' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Import/lazy/worker check (3.11–3.14; 3.14 on Linux/macOS/Windows) | ${{ needs.import-check.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Python tests (3.11/3.12/3.13/3.14) | ${{ needs.python-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| PostgreSQL platform integration | ${{ needs.postgres-integration.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
 
       - name: Fail if tests failed
-        if: needs.video-lesson-sandbox.result != 'success' || needs.chat-engine.result == 'failure' || needs.lint.result == 'failure' || needs.web-tests.result == 'failure' || needs.multi-worker-web.result == 'failure' || needs.import-check.result == 'failure' || needs.python-tests.result == 'failure'
+        if: needs.video-lesson-sandbox.result != 'success' || needs.chat-engine.result == 'failure' || needs.lint.result == 'failure' || needs.web-tests.result == 'failure' || needs.multi-worker-web.result == 'failure' || needs.import-check.result == 'failure' || needs.python-tests.result == 'failure' || needs.postgres-integration.result == 'failure'
         run: exit 1

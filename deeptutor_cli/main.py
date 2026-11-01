@@ -18,6 +18,7 @@ from .config_cmd import register as register_config
 from .doctor import register as register_doctor
 from .init_cmd import register as register_init
 from .module import register as register_module
+from .mcp import app as mcp_app
 from .plugin import register as register_plugin
 from .provider_cmd import register as register_provider
 from .session_cmd import register as register_session
@@ -50,6 +51,7 @@ app.add_typer(config_app, name="config")
 app.add_typer(session_app, name="session")
 app.add_typer(provider_app, name="provider")
 app.add_typer(workspace_app, name="workspace")
+app.add_typer(mcp_app, name="mcp")
 
 register_chat(chat_app)
 register_skill(skill_app)
