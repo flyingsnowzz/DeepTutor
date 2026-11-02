@@ -58,3 +58,37 @@ python -m pytest tests/workbuddy_skills -q
 - 图标/展示图：`workbuddy-skills/deeptutor-learning/listing/{icon,showcase}.png`
 - 隐私政策、用户协议、未成年人保护、服务依赖、授权解绑、支持邮箱（占位待运营替换）
 - 内部审核队列：待 WorkBuddy 开放平台账号与客户端接入后提交；提交前需把占位邮箱与域名替换为正式值。
+
+## 5. 2026-11-03 补充：真实模型与桌面端接入
+
+### WorkBuddy 客户端实际接入
+
+- 在 `~/.workbuddy/mcp.json` 注册 `deeptutor` stdio 服务，重启客户端后，“MCP 服务管理”
+  显示 `deeptutor` 已连接，`39/39 个工具已启用`。连接指示灯截图：
+  [`mcp-connection.png`](./mcp-connection.png)。
+- 初次连接时完成一次“信任此 MCP 服务”确认。首次排障发现：
+  1. `DEEPTUTOR_HOME` 未指向项目根目录时，日志目录会落到只读根目录并启动失败；
+  2. `DEEPTUTOR_MCP_DETERMINISTIC=1` 只返回占位内容，不调用真实模型。
+  现已分别修正为项目根目录和 `DEEPTUTOR_MCP_DETERMINISTIC=0`。
+
+### 真实内容生产验证（不是 WorkBuddy 兜底生成）
+
+| 场景 | 证据 | 结果 |
+| --- | --- | --- |
+| stdio 真实出题 | `e2e/05-real-llm-quiz-stdio.json` | job succeeded，完整题干 + A–D 选项 + 正确答案 + 解析 |
+| streamable HTTP 真实出题 | `e2e/05-real-llm-quiz-http.json` | Bearer 多账户路径 job succeeded，完整题干 + A–D 选项 + 正确答案 + 解析 |
+
+- 两次验证均调用 `quiz_generate_submit` → `quiz_generate_job_get`，使用
+  `DEEPTUTOR_MCP_DETERMINISTIC=0` 和真实 `spark-x2.6` 模型；
+- 返回 `summary.success=true / completed=1 / failed=0`，不是占位结果；
+- stdio 记录约 113 秒、4 次模型调用、17,566 tokens；HTTP 记录同题独立成功；
+- 说明：前两次真实尝试曾出现模型规划/输出不完整，第三次完整链路成功。生产使用仍需
+  关注模型输出稳定性与失败重试，不能把“管线接通”等同于“每次生成必然合格”。
+
+## 6. 当前仍需外部条件完成的事项
+
+- **WorkBuddy 桌面端触发词的完整对话验收**：已能创建学习任务，但模型回答过程中的
+  具体工具调用 UI 证据仍待一次完整人工/客户端联调；这不影响上述 MCP 官方客户端证据。
+- **WorkBuddy 开放平台提交**：需平台账号与客户端审核入口，内部 zip 已就绪。
+- **运营占位信息替换**：`listing/support-contact.md` 中的支持/安全邮箱和示例域名需换成
+  正式值后才能提交审核。

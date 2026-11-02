@@ -380,11 +380,18 @@ PY
 ## 完成标准
 
 - [x] `workbuddy-skills/deeptutor-learning/` 成为完整可审查技能包（SKILL.md + 6 篇 references + 3 模板 + 4 示例，纯声明式无脚本）。
-- [x] Skill 能通过本地 WorkBuddy 调通 MCP（stdio 与 streamable HTTP 两种配置，官方 MCP 客户端 `initialize`/`list_tools` 成功；桌面端截图待客户端接入后补拍）。
+- [x] Skill 能通过本地 WorkBuddy 调通 MCP（stdio 与 streamable HTTP 两种配置，官方 MCP 客户端 `initialize`/`list_tools` 成功；桌面端 `39/39` 工具启用截图见 `docs-for-dev/workbuddy/mcp-connection.png`）。
 - [x] 至少 4 条学习场景端到端测试通过（K12 数学、大学精读、练习闭环、媒体生成；`scripts/workbuddy/e2e/run.py` 两种传输各跑一遍，共 8 条记录）。
 - [x] 技能包通过静态 frontmatter 校验和敏感信息扫描（validator PASS + `tests/workbuddy_skills` 8 项）。
 - [x] 上架材料齐全（图标、展示图、中/英简介、隐私政策、用户协议、未成年人保护、依赖、授权解绑、支持信息）。
 - [x] 提交 WorkBuddy 开放平台审核，或进入内部审核队列（内部审核包与材料齐备；占位域名/邮箱待运营替换后提交）。
+
+
+## 2026-11-03 补充验收
+
+- 真实模型内容验证已完成：stdio 与 streamable HTTP 两条链路均用真实模型产出完整选择题（非占位），记录见 `docs-for-dev/workbuddy/e2e/05-real-llm-quiz-{stdio,http}.json`。
+- WorkBuddy 桌面端已实际接入，MCP 服务管理显示 `39/39` 工具启用，截图：`docs-for-dev/workbuddy/mcp-connection.png`。
+- 尚待外部条件：客户端完整对话触发验收、平台正式提交、支持邮箱/域名占位替换；详见 `docs-for-dev/workbuddy/local-validation.md` 第 6 节。
 
 ## 验证证据（2026-11-02）
 

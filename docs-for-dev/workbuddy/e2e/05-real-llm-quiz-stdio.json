@@ -1,0 +1,33 @@
+{
+  "scenario": "05-real-llm-quiz",
+  "transport": "stdio",
+  "client": "official mcp.client.stdio ClientSession",
+  "skill": "deeptutor-learning",
+  "deterministic_mode": false,
+  "llm_model": "spark-x2.6",
+  "user_prompt": "二次函数 y=x^2-4x+3 的顶点坐标，出 1 道最简单的选择题，4 个选项。",
+  "tool_flow": [
+    "quiz_generate_submit",
+    "quiz_generate_job_get"
+  ],
+  "job_status": "succeeded",
+  "question": "二次函数 y = x^2 - 4x + 3 的顶点坐标是（  ）",
+  "options": {
+    "A": "(2, -1)",
+    "B": "(-2, -1)",
+    "C": "(2, 1)",
+    "D": "(1, -2)"
+  },
+  "correct_answer": "A",
+  "explanation": "将二次函数 y = x^2 - 4x + 3 配方，得 y = (x - 2)^2 - 1，因此顶点坐标为 (2, -1)。也可利用顶点公式：x = -b/2a = -(-4)/(2×1) = 2，代入原函数得 y = 2^2 - 4×2 + 3 = -1，所以顶点坐标为 (2, -1)。",
+  "summary_success": true,
+  "completed": 1,
+  "failed": 0,
+  "cost_summary": {
+    "total_tokens": 17566,
+    "total_calls": 4,
+    "total_cost_usd": 0.0043903499999999995,
+    "duration_seconds": 113.27544175200455
+  },
+  "evidence_note": "此题由 DeepTutor MCP 真实模型管线生成，不是 WorkBuddy 兜底生成。前两次尝试曾出现模型输出不完整/规划不可用，第三次完整 MCP 链路成功。"
+}

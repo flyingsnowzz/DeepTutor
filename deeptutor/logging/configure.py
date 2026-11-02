@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from logging.handlers import RotatingFileHandler
+import os
 from pathlib import Path
 import sys
 from typing import TextIO
@@ -63,7 +64,11 @@ def configure_logging(
         root.addHandler(console)
 
     if config.file_output:
-        log_dir = Path(config.log_dir) if config.log_dir else Path("data/user/logs")
+        log_dir = (
+            Path(config.log_dir)
+            if config.log_dir
+            else Path(os.environ.get("DEEPTUTOR_HOME", "data/user")) / "logs"
+        )
         ensure_private_directory(log_dir)
         log_path = log_dir / "deeptutor.jsonl"
         file_handler = _managed(

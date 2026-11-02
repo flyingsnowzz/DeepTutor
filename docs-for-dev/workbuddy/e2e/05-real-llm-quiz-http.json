@@ -1,0 +1,27 @@
+{
+  "scenario": "05-real-llm-quiz-http",
+  "transport": "streamable-http",
+  "client": "official mcp.client.streamable_http ClientSession",
+  "skill": "deeptutor-learning",
+  "deterministic_mode": false,
+  "llm_model": "spark-x2.6",
+  "user_prompt": "二次函数 y=x^2-4x+3 的顶点坐标，出 1 道最简单的选择题，4 个选项。",
+  "tool_flow": [
+    "quiz_generate_submit",
+    "quiz_generate_job_get"
+  ],
+  "job_status": "succeeded",
+  "question": "二次函数 $y=x^2-4x+3$ 的顶点坐标是（ ）",
+  "options": {
+    "A": "$(2,\\,1)$",
+    "B": "$(-2,\\,-1)$",
+    "C": "$(2,\\,-1)$",
+    "D": "$(-2,\\,1)$"
+  },
+  "correct_answer": "C",
+  "explanation": "对 $y=x^2-4x+3$ 配方：$y=(x-2)^2-1$，因此顶点坐标为 $(2,-1)$，选 C。也可用顶点公式验证：$x=-\frac{b}{2a}=-\frac{-4}{2\times1}=2$，代入函数得 $y=2^2-4\times2+3=-1$，同样得到顶点 $(2,-1)$。干扰项 A $(2,1)$ 是把顶点纵坐标的符号搞错（误以为是 $+1$）；B、D 的横坐标 $-2$ 则是配方时把 $x-2$ 误写成 $x+2$ 所致，这是学生最易犯的两类错误。",
+  "summary_success": true,
+  "completed": 1,
+  "failed": 0,
+  "evidence_note": "远程 HTTP + Bearer 多账户路径下，DeepTutor MCP 真实模型管线生成的题目，不是 WorkBuddy 兜底生成。"
+}
