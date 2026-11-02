@@ -201,9 +201,9 @@ alembic upgrade head => 0003_auth_quota；base→head 全周期 downgrade/upgrad
         quota_ledger / audit_events / practice_ledger
 RLS：20 张个人表 owner_isolation 策略；受限角色 deeptutor_app 实测隔离
 
-# 测试（86 项，全部真实 Postgres/LocalStack）
+# 测试（87 项，全部真实 Postgres/LocalStack）
 pytest tests/services/{postgres,jobs,storage,auth,quota}        tests/learning/postgres tests/migration tests/mcp_server -q
-=> 86 passed（含 HTTP 端到端 14 项：401/注册登录/刷新轮换盗用吊销/
+=> 87 passed（含 HTTP 端到端 15 项：401/注册登录/刷新轮换盗用吊销/
    A-B 作业+产物+练习+掌握路径隔离/额度超限/限流/请求体上限/审计/request id）
 
 # 真实外部宿主联调（官方 streamable HTTP MCP 客户端）
