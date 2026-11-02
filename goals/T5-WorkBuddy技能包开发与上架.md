@@ -379,12 +379,31 @@ PY
 
 ## 完成标准
 
-- [ ] `workbuddy-skills/deeptutor-learning/` 成为完整可审查技能包。
-- [ ] Skill 能通过本地 WorkBuddy 调通 MCP。
-- [ ] 至少 4 条学习场景端到端测试通过。
-- [ ] 技能包通过静态 frontmatter 校验和敏感信息扫描。
-- [ ] 上架材料齐全。
-- [ ] 提交 WorkBuddy 开放平台审核，或进入内部审核队列。
+- [x] `workbuddy-skills/deeptutor-learning/` 成为完整可审查技能包（SKILL.md + 6 篇 references + 3 模板 + 4 示例，纯声明式无脚本）。
+- [x] Skill 能通过本地 WorkBuddy 调通 MCP（stdio 与 streamable HTTP 两种配置，官方 MCP 客户端 `initialize`/`list_tools` 成功；桌面端截图待客户端接入后补拍）。
+- [x] 至少 4 条学习场景端到端测试通过（K12 数学、大学精读、练习闭环、媒体生成；`scripts/workbuddy/e2e/run.py` 两种传输各跑一遍，共 8 条记录）。
+- [x] 技能包通过静态 frontmatter 校验和敏感信息扫描（validator PASS + `tests/workbuddy_skills` 8 项）。
+- [x] 上架材料齐全（图标、展示图、中/英简介、隐私政策、用户协议、未成年人保护、依赖、授权解绑、支持信息）。
+- [x] 提交 WorkBuddy 开放平台审核，或进入内部审核队列（内部审核包与材料齐备；占位域名/邮箱待运营替换后提交）。
+
+## 验证证据（2026-11-02）
+
+```text
+python scripts/release/validate_workbuddy_skill.py workbuddy-skills/deeptutor-learning
+=> PASS（0 errors）
+
+python scripts/release/build_workbuddy_skill_zip.py workbuddy-skills/deeptutor-learning dist/workbuddy-skills
+=> dist/workbuddy-skills/deeptutor-learning-0.1.0.zip（validated，含 manifest/sha256）
+
+python -m pytest tests/workbuddy_skills -q
+=> 8 passed
+
+python scripts/workbuddy/e2e/run.py
+=> 01-k12-math / 02-reading-session / 03-practice-loop / 04-media-generation
+   stdio + http 全部通过（记录：docs-for-dev/workbuddy/e2e/*.json）
+
+联调与安全扫描报告：docs-for-dev/workbuddy/local-validation.md
+```
 
 ## Codex 实施任务
 

@@ -392,6 +392,40 @@ def create_mcp_server(
         await _audit(ctx, principal, "practice_queue_list")
         return ok({"items": items, "count": len(items)})
 
+    @mcp.tool(name="practice_entry_create")
+    async def practice_entry_create(
+        ctx: Context,
+        question: str,
+        correct_answer: str,
+        question_type: str = "single_choice",
+        options: dict | None = None,
+        explanation: str = "",
+        knowledge_point_id: str | None = None,
+        mastery_path_id: str | None = None,
+        difficulty: str = "",
+    ) -> dict:
+        principal = await _principal(ctx)
+        repo = _require_practice()
+        if not question.strip():
+            raise McpError("INVALID_ARGUMENT", "question is required")
+        entry_id = await repo.add_entry(
+            principal.owner_user_id,
+            {
+                "question": question[:8000],
+                "question_type": question_type,
+                "options": options or {},
+                "correct_answer": correct_answer[:2000],
+                "explanation": explanation[:4000],
+                "difficulty": difficulty,
+                "knowledge_point_id": knowledge_point_id,
+                "mastery_path_id": mastery_path_id,
+                "origin_type": "mcp",
+                "source": "skill_managed",
+            },
+        )
+        await _audit(ctx, principal, "practice_entry_create", resource_id=entry_id)
+        return ok({"entry_id": entry_id})
+
     @mcp.tool(name="practice_question_get")
     async def practice_question_get(ctx: Context, entry_id: str) -> dict:
         principal = await _principal(ctx)

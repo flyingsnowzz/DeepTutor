@@ -1,0 +1,242 @@
+{
+  "scenario": "03-practice-loop",
+  "transport": "http",
+  "user_prompt": "我做完昨天那道选择题了，选 A；帮我判分并安排复习",
+  "skill": "deeptutor-learning",
+  "tool_calls": [
+    {
+      "tool": "practice_summary_get",
+      "arguments": {},
+      "response": {
+        "ok": true,
+        "data": {
+          "total": 0,
+          "resolved": 0,
+          "unresolved": 0,
+          "bookmarked": 0,
+          "mistakes": 0,
+          "due": 0,
+          "quota": {
+            "plan": "free",
+            "day": {
+              "solve": {
+                "consumed": 1,
+                "limit": 20,
+                "remaining": 19
+              },
+              "question": {
+                "consumed": 1,
+                "limit": 50,
+                "remaining": 49
+              }
+            },
+            "month": {
+              "solve": {
+                "consumed": 1,
+                "limit": 300,
+                "remaining": 299
+              },
+              "question": {
+                "consumed": 1,
+                "limit": 500,
+                "remaining": 499
+              }
+            }
+          }
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "practice_entry_create",
+      "arguments": {
+        "question": "二次函数 y=x²-4x+3 的顶点坐标是？",
+        "question_type": "single_choice",
+        "options": {
+          "A": "(2,1)",
+          "B": "(2,-1)",
+          "C": "(-2,1)",
+          "D": "(-2,-1)"
+        },
+        "correct_answer": "B",
+        "knowledge_point_id": "kp-quadratic-vertex"
+      },
+      "response": {
+        "ok": true,
+        "data": {
+          "entry_id": "practice_b556c758aca640c6909b81641b453dae"
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "practice_answer_check",
+      "arguments": {
+        "entry_id": "practice_b556c758aca640c6909b81641b453dae",
+        "answer": "A",
+        "request_id": "e2e:2437e73452f640b1a2a84fbb6bae2a1c"
+      },
+      "response": {
+        "ok": true,
+        "data": {
+          "entry_id": "practice_b556c758aca640c6909b81641b453dae",
+          "request_id": "e2e:2437e73452f640b1a2a84fbb6bae2a1c",
+          "is_correct": false,
+          "correct_answer": "B",
+          "review": {
+            "rating": "again",
+            "due_at": "2026-11-02T14:32:17.868788+00:00",
+            "interval_days": 0.0,
+            "ease": 2.3,
+            "streak": 0,
+            "lapses": 1,
+            "review_count": 1
+          },
+          "replayed": false
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "practice_answer_check",
+      "arguments": {
+        "entry_id": "practice_b556c758aca640c6909b81641b453dae",
+        "answer": "B",
+        "request_id": "e2e:2437e73452f640b1a2a84fbb6bae2a1c"
+      },
+      "response": {
+        "ok": true,
+        "data": {
+          "entry_id": "practice_b556c758aca640c6909b81641b453dae",
+          "request_id": "e2e:2437e73452f640b1a2a84fbb6bae2a1c",
+          "kind": "check",
+          "answer": "A",
+          "rating": "",
+          "is_correct": false,
+          "replayed": true
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "practice_queue_list",
+      "arguments": {},
+      "response": {
+        "ok": true,
+        "data": {
+          "items": [
+            {
+              "entry_id": "practice_b556c758aca640c6909b81641b453dae",
+              "question": "二次函数 y=x²-4x+3 的顶点坐标是？",
+              "question_type": "single_choice",
+              "correct_answer": "B",
+              "explanation": "",
+              "knowledge_point_id": "kp-quadratic-vertex",
+              "rating": "again",
+              "due_at": "2026-11-02T14:32:17.868788Z",
+              "review_count": 1,
+              "interval_days": 0.0,
+              "ease": 2.3,
+              "streak": 0,
+              "options": {
+                "A": "(2,1)",
+                "B": "(2,-1)",
+                "C": "(-2,1)",
+                "D": "(-2,-1)"
+              }
+            }
+          ],
+          "count": 1
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "practice_review_submit",
+      "arguments": {
+        "entry_id": "practice_b556c758aca640c6909b81641b453dae",
+        "rating": "good",
+        "request_id": "e2e:66e9b0ffead14537b335eced905b0af5"
+      },
+      "response": {
+        "ok": true,
+        "data": {
+          "entry_id": "practice_b556c758aca640c6909b81641b453dae",
+          "request_id": "e2e:66e9b0ffead14537b335eced905b0af5",
+          "rating": "good",
+          "review": {
+            "rating": "good",
+            "due_at": "2026-11-03T14:32:17.899964+00:00",
+            "interval_days": 1.0,
+            "ease": 2.3,
+            "streak": 1,
+            "lapses": 1,
+            "review_count": 2
+          },
+          "replayed": false
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "practice_summary_get",
+      "arguments": {},
+      "response": {
+        "ok": true,
+        "data": {
+          "total": 1,
+          "resolved": 1,
+          "unresolved": 0,
+          "bookmarked": 0,
+          "mistakes": 1,
+          "due": 0,
+          "quota": {
+            "plan": "free",
+            "day": {
+              "solve": {
+                "consumed": 1,
+                "limit": 20,
+                "remaining": 19
+              },
+              "question": {
+                "consumed": 1,
+                "limit": 50,
+                "remaining": 49
+              },
+              "practice": {
+                "consumed": 2,
+                "limit": 300,
+                "remaining": 298
+              }
+            },
+            "month": {
+              "solve": {
+                "consumed": 1,
+                "limit": 300,
+                "remaining": 299
+              },
+              "question": {
+                "consumed": 1,
+                "limit": 500,
+                "remaining": 499
+              },
+              "practice": {
+                "consumed": 2,
+                "limit": 5000,
+                "remaining": 4998
+              }
+            }
+          }
+        },
+        "error": null
+      }
+    }
+  ],
+  "final_reply": "这题错在配方符号：顶点为 (2,-1)；已进入间隔复习，按 good 评级安排下次复习。",
+  "elapsed_seconds": 0.077,
+  "cost": {
+    "model": "deterministic (offline)",
+    "llm_cost_usd": 0.0
+  },
+  "recorded_at": "2026-11-02 22:32:17"
+}

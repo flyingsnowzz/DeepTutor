@@ -35,10 +35,28 @@ def serve(
         from deeptutor.mcp_server.server import create_mcp_server
 
         jobs, store = build_runtime_services(runner=_runner(deterministic))
+        extras = {}
+        if os.environ.get("DATABASE_URL"):
+            # Same application services as the cloud stack; stdio just uses the
+            # single local account instead of per-request Bearer principals.
+            from deeptutor.learning.storage_postgres import PostgresMasteryRepository
+            from deeptutor.services.hooks import HookService
+            from deeptutor.services.postgres.database import create_engine
+            from deeptutor.services.practice.postgres import PostgresPracticeRepository
+            from deeptutor.services.reading.service import ReadingService
+
+            engine = create_engine(os.environ["DATABASE_URL"])
+            extras = {
+                "practice_repo": PostgresPracticeRepository(engine),
+                "mastery_repo": PostgresMasteryRepository(engine),
+                "reading_service": ReadingService(engine, object_store=store),
+                "hook_service": HookService(engine),
+            }
         server = create_mcp_server(
             owner_user_id="local-dev-user",
             job_service=jobs,
             object_store=store,
+            **extras,
         )
         asyncio.run(server.run_stdio_async())
         return

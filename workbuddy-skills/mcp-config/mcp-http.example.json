@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "deeptutor": {
+      "transport": "streamable-http",
+      "url": "https://mcp.deeptutor.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer <ACCESS_TOKEN_FROM_HOSTED_LOGIN>"
+      }
+    }
+  }
+}

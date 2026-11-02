@@ -406,7 +406,7 @@ jobs:
         run: |
           pytest -q tests/services/postgres tests/services/jobs tests/services/auth tests/services/quota \
             tests/services/reading tests/services/hooks \
-            tests/learning/postgres tests/migration tests/mcp_server tests/integration
+            tests/learning/postgres tests/migration tests/mcp_server tests/integration tests/workbuddy_skills
 
   video-lesson-sandbox:
     name: Video lesson isolation (${{ matrix.os }})

@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "deeptutor": {
+      "transport": "stdio",
+      "command": "deeptutor",
+      "args": ["mcp", "serve", "--transport", "stdio"],
+      "env": {
+        "DATABASE_URL": "postgresql+asyncpg://deeptutor:deeptutor@127.0.0.1:5432/deeptutor",
+        "S3_ENDPOINT": "http://127.0.0.1:4566",
+        "S3_BUCKET": "deeptutor-dev",
+        "S3_ACCESS_KEY_ID": "replace-me",
+        "S3_SECRET_ACCESS_KEY": "replace-me",
+        "DEEPTUTOR_MCP_DETERMINISTIC": "1"
+      }
+    }
+  }
+}

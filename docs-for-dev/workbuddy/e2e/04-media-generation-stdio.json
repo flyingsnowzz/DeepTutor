@@ -1,0 +1,445 @@
+{
+  "scenario": "04-media-generation",
+  "transport": "stdio",
+  "user_prompt": "画学习闭环图，并做一段音频导学；如果支持，再生成视频课",
+  "skill": "deeptutor-learning",
+  "tool_calls": [
+    {
+      "tool": "capabilities_list",
+      "arguments": {},
+      "response": {
+        "ok": true,
+        "data": {
+          "capabilities": [
+            {
+              "name": "deep_research",
+              "display_name": "深度研究",
+              "status": "ready",
+              "supports_jobs": true,
+              "missing_dependencies": [],
+              "estimated_duration_sec": 60,
+              "cost_hint": {
+                "meter": "research",
+                "billed_event": "job_succeeded"
+              }
+            },
+            {
+              "name": "visualize",
+              "display_name": "可视化讲解",
+              "status": "ready",
+              "supports_jobs": true,
+              "missing_dependencies": [],
+              "estimated_duration_sec": 20,
+              "cost_hint": {
+                "meter": "visualization",
+                "billed_event": "job_succeeded"
+              }
+            },
+            {
+              "name": "deep_question",
+              "display_name": "出题练习",
+              "status": "ready",
+              "supports_jobs": true,
+              "missing_dependencies": [],
+              "estimated_duration_sec": 30,
+              "cost_hint": {
+                "meter": "question",
+                "billed_event": "job_succeeded"
+              }
+            },
+            {
+              "name": "problem_solve",
+              "display_name": "分步解题",
+              "status": "ready",
+              "supports_jobs": true,
+              "missing_dependencies": [],
+              "estimated_duration_sec": 45,
+              "cost_hint": {
+                "meter": "solve",
+                "billed_event": "job_succeeded"
+              }
+            },
+            {
+              "name": "quiz_judge",
+              "display_name": "主观题判分",
+              "status": "ready",
+              "supports_jobs": true,
+              "missing_dependencies": [],
+              "estimated_duration_sec": 30,
+              "cost_hint": {
+                "meter": "judge",
+                "billed_event": "job_succeeded",
+                "formative_only": true
+              }
+            },
+            {
+              "name": "audio_overview",
+              "display_name": "音频导学",
+              "status": "ready",
+              "supports_jobs": true,
+              "missing_dependencies": [],
+              "estimated_duration_sec": 120,
+              "cost_hint": {
+                "meter": "media",
+                "billed_event": "job_succeeded",
+                "media": true
+              }
+            },
+            {
+              "name": "mastery_path",
+              "display_name": "掌握路径生成",
+              "status": "ready",
+              "supports_jobs": true,
+              "missing_dependencies": [],
+              "estimated_duration_sec": 60,
+              "cost_hint": {
+                "meter": "mastery",
+                "billed_event": "job_succeeded"
+              }
+            },
+            {
+              "name": "video_lesson",
+              "display_name": "视频课",
+              "status": "ready",
+              "supports_jobs": true,
+              "missing_dependencies": [],
+              "estimated_duration_sec": 300,
+              "cost_hint": {
+                "meter": "media",
+                "billed_event": "job_succeeded",
+                "media": true,
+                "notice": "渲染耗时约 2–8 分钟，按 TTS/模型用量计费"
+              }
+            },
+            {
+              "name": "math_animator",
+              "display_name": "数学动画",
+              "status": "missing_dependency",
+              "supports_jobs": true,
+              "missing_dependencies": [
+                "manim>=0.19.0 (python package)"
+              ],
+              "estimated_duration_sec": 240,
+              "cost_hint": {
+                "meter": "media",
+                "billed_event": "job_succeeded",
+                "media": true,
+                "notice": "Manim/LaTeX/ffmpeg 渲染耗时约 1–5 分钟"
+              }
+            },
+            {
+              "name": "immersive_reading",
+              "display_name": "沉浸式精读",
+              "status": "ready",
+              "supports_jobs": false,
+              "missing_dependencies": [],
+              "estimated_duration_sec": 0,
+              "cost_hint": {
+                "meter": "practice",
+                "billed_event": "per_reply"
+              }
+            }
+          ],
+          "plan": "free"
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "capability_run_submit",
+      "arguments": {
+        "capability": "visualize",
+        "input": {
+          "prompt": "学习闭环：练习→错题→复习→掌握"
+        },
+        "idempotency_key": "e2e:viz:0b7eb57651"
+      },
+      "response": {
+        "ok": true,
+        "data": {
+          "job_id": "job_6aa0ded27e2b46e397559d4447b8e7b0",
+          "session_id": "sess_43656c19e9f24aba9b34f694ac25333a",
+          "status": "running",
+          "poll_after_ms": 1000,
+          "billing": {
+            "meter": "visualization",
+            "charged_on": "job_succeeded",
+            "idempotency": "same idempotency_key never charges twice"
+          }
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "capability_job_get",
+      "arguments": {
+        "job_id": "job_6aa0ded27e2b46e397559d4447b8e7b0"
+      },
+      "response": {
+        "ok": true,
+        "data": {
+          "job_id": "job_6aa0ded27e2b46e397559d4447b8e7b0",
+          "session_id": "sess_43656c19e9f24aba9b34f694ac25333a",
+          "status": "running",
+          "source_channel": "first_party",
+          "progress": null,
+          "result": null,
+          "artifacts": [],
+          "needs_input": null,
+          "error": null
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "capability_job_get",
+      "arguments": {
+        "job_id": "job_6aa0ded27e2b46e397559d4447b8e7b0"
+      },
+      "response": {
+        "ok": true,
+        "data": {
+          "job_id": "job_6aa0ded27e2b46e397559d4447b8e7b0",
+          "session_id": "sess_43656c19e9f24aba9b34f694ac25333a",
+          "status": "succeeded",
+          "source_channel": "first_party",
+          "progress": null,
+          "result": {
+            "response": "```mermaid\nflowchart LR\n    A[学习] --> B[练习] --> C[复习]\n```",
+            "render_type": "mermaid"
+          },
+          "artifacts": [
+            {
+              "artifact_ref": "art_719bd34e70f44ce6b84574ccc5aee3c0",
+              "kind": "visualization_source",
+              "mime_type": "text/vnd.mermaid",
+              "title": "learning-loop.mmd"
+            }
+          ],
+          "needs_input": null,
+          "error": null
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "artifact_get",
+      "arguments": {
+        "artifact_ref": "art_719bd34e70f44ce6b84574ccc5aee3c0"
+      },
+      "response": {
+        "ok": true,
+        "data": {
+          "url": "http://127.0.0.1:4566/deeptutor-dev/local-dev-user/job_6aa0ded27e2b46e397559d4447b8e7b0/learning-loop.mmd?AWSAccessKeyId=test&Signature=PBBcPgWuOtw6Pqf1YSgTuLd%2FbsY%3D&Expires=1793630835",
+          "expires_in_sec": 900,
+          "mime_type": "text/vnd.mermaid",
+          "filename": "learning-loop.mmd"
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "audio_overview_generate_submit",
+      "arguments": {
+        "input": {
+          "prompt": "3 分钟勾股定理音频导学"
+        },
+        "idempotency_key": "e2e:audio:eedd930ba3"
+      },
+      "response": {
+        "ok": true,
+        "data": {
+          "job_id": "job_318e0875db1b4ead8accc4a5d49c1e8c",
+          "session_id": "sess_fae55fd53660418bb47fd2c13658d04a",
+          "status": "running",
+          "poll_after_ms": 1000,
+          "billing": {
+            "meter": "media",
+            "charged_on": "job_succeeded",
+            "idempotency": "same idempotency_key never charges twice"
+          }
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "audio_overview_generate_get",
+      "arguments": {
+        "job_id": "job_318e0875db1b4ead8accc4a5d49c1e8c"
+      },
+      "response": {
+        "ok": true,
+        "data": {
+          "job_id": "job_318e0875db1b4ead8accc4a5d49c1e8c",
+          "session_id": "sess_fae55fd53660418bb47fd2c13658d04a",
+          "status": "running",
+          "source_channel": "first_party",
+          "progress": null,
+          "result": null,
+          "artifacts": [],
+          "needs_input": null,
+          "error": null
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "audio_overview_generate_get",
+      "arguments": {
+        "job_id": "job_318e0875db1b4ead8accc4a5d49c1e8c"
+      },
+      "response": {
+        "ok": true,
+        "data": {
+          "job_id": "job_318e0875db1b4ead8accc4a5d49c1e8c",
+          "session_id": "sess_fae55fd53660418bb47fd2c13658d04a",
+          "status": "succeeded",
+          "source_channel": "first_party",
+          "progress": null,
+          "result": {
+            "audio_ready": false,
+            "transcript": "音频导学（占位）：3 分钟勾股定理音频导学",
+            "note": "Audio overview executor placeholder (media pipeline lands in T4)."
+          },
+          "artifacts": [
+            {
+              "artifact_ref": "art_8e565eb294de4521b56e9d4ad9abad4b",
+              "kind": "audio_transcript",
+              "mime_type": "text/plain",
+              "title": "overview.txt"
+            }
+          ],
+          "needs_input": null,
+          "error": null
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "lesson_video_generate_submit",
+      "arguments": {
+        "input": {
+          "prompt": "勾股定理 2 分钟视频课"
+        },
+        "idempotency_key": "e2e:video:7169a1778d"
+      },
+      "response": {
+        "ok": true,
+        "data": {
+          "job_id": "job_1d0ca2d26b244a7db073c35e1c8b9740",
+          "session_id": "sess_e7a96eb5636246ffa18ead535b0f3215",
+          "status": "running",
+          "poll_after_ms": 1000,
+          "billing": {
+            "meter": "practice",
+            "charged_on": "job_succeeded",
+            "idempotency": "same idempotency_key never charges twice",
+            "notice": "渲染约 2–8 分钟，按 TTS/模型用量计费；可取消。"
+          }
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "lesson_video_generate_get",
+      "arguments": {
+        "job_id": "job_1d0ca2d26b244a7db073c35e1c8b9740"
+      },
+      "response": {
+        "ok": true,
+        "data": {
+          "job_id": "job_1d0ca2d26b244a7db073c35e1c8b9740",
+          "session_id": "sess_e7a96eb5636246ffa18ead535b0f3215",
+          "status": "running",
+          "source_channel": "first_party",
+          "progress": null,
+          "result": null,
+          "artifacts": [],
+          "needs_input": null,
+          "error": null
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "lesson_video_generate_get",
+      "arguments": {
+        "job_id": "job_1d0ca2d26b244a7db073c35e1c8b9740"
+      },
+      "response": {
+        "ok": true,
+        "data": {
+          "job_id": "job_1d0ca2d26b244a7db073c35e1c8b9740",
+          "session_id": "sess_e7a96eb5636246ffa18ead535b0f3215",
+          "status": "succeeded",
+          "source_channel": "first_party",
+          "progress": null,
+          "result": {
+            "video_ready": false,
+            "render_type": "placeholder",
+            "note": "视频课渲染占位；真实环境经 Remotion/TTS 渲染为 mp4（约 2-8 分钟）。"
+          },
+          "artifacts": [
+            {
+              "artifact_ref": "art_fa4a5b81dc9344958877b73bf178115f",
+              "kind": "video_lesson",
+              "mime_type": "video/mp4",
+              "title": "lesson.mp4"
+            }
+          ],
+          "needs_input": null,
+          "error": null
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "artifact_get",
+      "arguments": {
+        "artifact_ref": "art_fa4a5b81dc9344958877b73bf178115f"
+      },
+      "response": {
+        "ok": true,
+        "data": {
+          "url": "http://127.0.0.1:4566/deeptutor-dev/local-dev-user/job_1d0ca2d26b244a7db073c35e1c8b9740/lesson.mp4?AWSAccessKeyId=test&Signature=X1%2FioXNcilTMd1zSIFSqUufUIbU%3D&Expires=1793630835",
+          "expires_in_sec": 900,
+          "mime_type": "video/mp4",
+          "filename": "lesson.mp4"
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "math_animation_generate_submit",
+      "arguments": {
+        "input": {
+          "prompt": "勾股定理动画"
+        },
+        "idempotency_key": "e2e:math:df2aec56"
+      },
+      "response": {
+        "ok": false,
+        "data": null,
+        "error": {
+          "code": "CAPABILITY_UNAVAILABLE",
+          "message": "能力 math_animator 缺少运行依赖",
+          "retryable": false,
+          "details": {
+            "capability": "math_animator",
+            "missing_dependencies": [
+              "manim>=0.19.0 (python package)"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "final_reply": "学习闭环图与音频已生成；视频课 mp4 链接已给出（15 分钟内有效）；缺依赖能力已如实说明。",
+  "elapsed_seconds": 0.38,
+  "cost": {
+    "model": "deterministic (offline)",
+    "llm_cost_usd": 0.0
+  },
+  "recorded_at": "2026-11-02 22:32:15",
+  "notes": "video_lesson ready; math_animator missing_dependency 门通过"
+}

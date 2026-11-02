@@ -1,0 +1,282 @@
+{
+  "scenario": "01-k12-math",
+  "transport": "http",
+  "user_prompt": "一步步讲懂 y=x²-4x+3 的顶点坐标，再给我两道同类练习",
+  "skill": "deeptutor-learning",
+  "tool_calls": [
+    {
+      "tool": "capabilities_list",
+      "arguments": {},
+      "response": {
+        "ok": true,
+        "data": {
+          "capabilities": [
+            {
+              "name": "deep_research",
+              "display_name": "深度研究",
+              "status": "ready",
+              "supports_jobs": true,
+              "missing_dependencies": [],
+              "estimated_duration_sec": 60,
+              "cost_hint": {
+                "meter": "research",
+                "billed_event": "job_succeeded"
+              }
+            },
+            {
+              "name": "visualize",
+              "display_name": "可视化讲解",
+              "status": "ready",
+              "supports_jobs": true,
+              "missing_dependencies": [],
+              "estimated_duration_sec": 20,
+              "cost_hint": {
+                "meter": "visualization",
+                "billed_event": "job_succeeded"
+              }
+            },
+            {
+              "name": "deep_question",
+              "display_name": "出题练习",
+              "status": "ready",
+              "supports_jobs": true,
+              "missing_dependencies": [],
+              "estimated_duration_sec": 30,
+              "cost_hint": {
+                "meter": "question",
+                "billed_event": "job_succeeded"
+              }
+            },
+            {
+              "name": "problem_solve",
+              "display_name": "分步解题",
+              "status": "ready",
+              "supports_jobs": true,
+              "missing_dependencies": [],
+              "estimated_duration_sec": 45,
+              "cost_hint": {
+                "meter": "solve",
+                "billed_event": "job_succeeded"
+              }
+            },
+            {
+              "name": "quiz_judge",
+              "display_name": "主观题判分",
+              "status": "ready",
+              "supports_jobs": true,
+              "missing_dependencies": [],
+              "estimated_duration_sec": 30,
+              "cost_hint": {
+                "meter": "judge",
+                "billed_event": "job_succeeded",
+                "formative_only": true
+              }
+            },
+            {
+              "name": "audio_overview",
+              "display_name": "音频导学",
+              "status": "ready",
+              "supports_jobs": true,
+              "missing_dependencies": [],
+              "estimated_duration_sec": 120,
+              "cost_hint": {
+                "meter": "media",
+                "billed_event": "job_succeeded",
+                "media": true
+              }
+            },
+            {
+              "name": "mastery_path",
+              "display_name": "掌握路径生成",
+              "status": "ready",
+              "supports_jobs": true,
+              "missing_dependencies": [],
+              "estimated_duration_sec": 60,
+              "cost_hint": {
+                "meter": "mastery",
+                "billed_event": "job_succeeded"
+              }
+            },
+            {
+              "name": "video_lesson",
+              "display_name": "视频课",
+              "status": "ready",
+              "supports_jobs": true,
+              "missing_dependencies": [],
+              "estimated_duration_sec": 300,
+              "cost_hint": {
+                "meter": "media",
+                "billed_event": "job_succeeded",
+                "media": true,
+                "notice": "渲染耗时约 2–8 分钟，按 TTS/模型用量计费"
+              }
+            },
+            {
+              "name": "math_animator",
+              "display_name": "数学动画",
+              "status": "missing_dependency",
+              "supports_jobs": true,
+              "missing_dependencies": [
+                "manim>=0.19.0 (python package)"
+              ],
+              "estimated_duration_sec": 240,
+              "cost_hint": {
+                "meter": "media",
+                "billed_event": "job_succeeded",
+                "media": true,
+                "notice": "Manim/LaTeX/ffmpeg 渲染耗时约 1–5 分钟"
+              }
+            },
+            {
+              "name": "immersive_reading",
+              "display_name": "沉浸式精读",
+              "status": "ready",
+              "supports_jobs": false,
+              "missing_dependencies": [],
+              "estimated_duration_sec": 0,
+              "cost_hint": {
+                "meter": "practice",
+                "billed_event": "per_reply"
+              }
+            }
+          ],
+          "plan": "free"
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "problem_solve_submit",
+      "arguments": {
+        "input": {
+          "prompt": "初三数学：y=x²-4x+3 求顶点坐标，分步讲解",
+          "source_channel": "workbuddy"
+        },
+        "idempotency_key": "e2e:solve:6936948b81"
+      },
+      "response": {
+        "ok": true,
+        "data": {
+          "job_id": "job_4ac7eef84de445d8b1f6c21ced35d493",
+          "session_id": "sess_5273a0dbec734cc3a856abd0a2ddd9f8",
+          "status": "running",
+          "poll_after_ms": 1000,
+          "billing": {
+            "meter": "solve",
+            "charged_on": "job_succeeded",
+            "idempotency": "same idempotency_key never charges twice"
+          }
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "problem_solve_get",
+      "arguments": {
+        "job_id": "job_4ac7eef84de445d8b1f6c21ced35d493"
+      },
+      "response": {
+        "ok": true,
+        "data": {
+          "job_id": "job_4ac7eef84de445d8b1f6c21ced35d493",
+          "session_id": "sess_5273a0dbec734cc3a856abd0a2ddd9f8",
+          "status": "running",
+          "source_channel": "first_party",
+          "progress": null,
+          "result": null,
+          "artifacts": [],
+          "needs_input": null,
+          "error": null
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "problem_solve_get",
+      "arguments": {
+        "job_id": "job_4ac7eef84de445d8b1f6c21ced35d493"
+      },
+      "response": {
+        "ok": true,
+        "data": {
+          "job_id": "job_4ac7eef84de445d8b1f6c21ced35d493",
+          "session_id": "sess_5273a0dbec734cc3a856abd0a2ddd9f8",
+          "status": "succeeded",
+          "source_channel": "first_party",
+          "progress": null,
+          "result": {
+            "steps": [
+              {
+                "index": 1,
+                "title": "审题",
+                "body": "初三数学：y=x²-4x+3 求顶点坐标，分步讲解"
+              }
+            ],
+            "final_answer": "",
+            "similar_practice": [],
+            "note": "Step-by-step solve executor placeholder."
+          },
+          "artifacts": [],
+          "needs_input": null,
+          "error": null
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "quiz_generate_submit",
+      "arguments": {
+        "input": {
+          "prompt": "出 2 道初三二次函数求顶点的同类选择题"
+        },
+        "idempotency_key": "e2e:quiz:1b20e4b4b4"
+      },
+      "response": {
+        "ok": true,
+        "data": {
+          "job_id": "job_2b65c3cf163741f3882b6f4b3ae8d741",
+          "session_id": "sess_980256409c814282863f0ce301d54619",
+          "status": "running",
+          "poll_after_ms": 1000,
+          "billing": {
+            "meter": "question",
+            "charged_on": "job_succeeded",
+            "idempotency": "same idempotency_key never charges twice"
+          }
+        },
+        "error": null
+      }
+    },
+    {
+      "tool": "quiz_generate_job_get",
+      "arguments": {
+        "job_id": "job_2b65c3cf163741f3882b6f4b3ae8d741"
+      },
+      "response": {
+        "ok": true,
+        "data": {
+          "job_id": "job_2b65c3cf163741f3882b6f4b3ae8d741",
+          "session_id": "sess_980256409c814282863f0ce301d54619",
+          "status": "succeeded",
+          "source_channel": "first_party",
+          "progress": null,
+          "result": {
+            "questions": [],
+            "note": "Quiz generation executor placeholder."
+          },
+          "artifacts": [],
+          "needs_input": null,
+          "error": null
+        },
+        "error": null
+      }
+    }
+  ],
+  "final_reply": "先配方：y=(x-2)²-1，顶点为 (2,-1)；已附两道同类练习，做完发我判分并安排复习。",
+  "elapsed_seconds": 0.171,
+  "cost": {
+    "model": "deterministic (offline)",
+    "llm_cost_usd": 0.0
+  },
+  "recorded_at": "2026-11-02 22:32:17"
+}
