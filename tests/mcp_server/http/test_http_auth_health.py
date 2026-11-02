@@ -1,6 +1,12 @@
 from __future__ import annotations
 
 
+def test_hosted_login_page(http_client):
+    r = http_client.get("/login")
+    assert r.status_code == 200 and "text/html" in r.headers["content-type"]
+    assert "/v1/auth/login" in r.text and "password" in r.text
+
+
 def test_health_ready_and_plans(http_client):
     assert http_client.get("/healthz").json()["data"]["status"] == "ok"
     ready = http_client.get("/readyz")

@@ -133,3 +133,37 @@ scripts/mcp_http_smoke.py:
 ```
 
 备份恢复见 `postgres-storage.md` §8；新路径不写业务 SQLite（T2 回归测试持续有效）。
+
+## 10. 部署、托管依赖与回滚
+
+### 10.1 Postgres（生产）
+
+- 使用云厂商托管 Postgres 15+：开启**自动备份 + PITR**；试用阶段单实例 + 每日
+  `pg_dump -Fc` 异地留存，GA 前规划 HA 与只读副本；
+- 应用以受限角色 `deeptutor_app` 连接（`deploy/postgres/init/01_app_role.sql`），
+  迁移 job 使用表 owner 角色；RLS 因此始终生效；
+- 连接池：SQLAlchemy 已 `pool_pre_ping=True`；多副本时经 pgbouncer（transaction
+  pooling）或云厂商连接池接入，避免每进程直连耗尽连接；
+- 上线流程：`alembic upgrade head`（0003 全部 DDL 事务化），应用随后滚动发布；
+- 回滚：先回应用（蓝绿切流），确需回退 schema 时执行 `alembic downgrade -1`
+  （0003 downgrade 会恢复 0002 形态），回退前用 PITR/快照兜底。
+
+### 10.2 对象存储
+
+- 私有桶 + 桶策略拒绝匿名访问；开启版本化；`tmp/` 等前缀配置生命周期（如 7 天过期）；
+- 密钥通过环境变量/密钥管理下发，禁止写入镜像或仓库；
+- CDN 仅用于非敏感公开素材；学习产物一律走 900 秒预签名 URL。
+
+### 10.3 服务进程与蓝绿
+
+- 进程无状态：水平多副本 + 负载均衡；本地限流为进程内滑动窗口，扩副本后换 Redis 实现；
+- 蓝绿：两套环境共用同一托管 Postgres（schema 向后兼容时直接切流），健康检查
+  `/healthz`（进程存活）与 `/readyz`（DB 连通）分开用于编排探针；
+- 关键配置：`DEEPTUTOR_JWT_SECRET`（≥32 字符，openssl rand -hex 32）轮换时旧 access
+  token 自然过期（1 小时），refresh 哈希在库无需迁移密钥（轮换 JWT secret 只影响新发 access）。
+
+### 10.4 最小生产环境变量
+
+见 `deploy/env/mcp.example.env`、`deploy/env/postgres.example.env`。最小集合：
+`DATABASE_URL`（deeptutor_app 角色）、`S3_*`、`DEEPTUTOR_JWT_SECRET`、
+`DEEPTUTOR_PUBLIC_BASE_URL=https://...`、`DEEPTUTOR_TOKEN_ISSUER`。

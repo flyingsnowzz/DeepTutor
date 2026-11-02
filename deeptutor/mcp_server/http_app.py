@@ -20,7 +20,7 @@ from typing import Any
 
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
-from starlette.responses import JSONResponse
+from starlette.responses import HTMLResponse, JSONResponse
 from starlette.routing import Mount, Route
 
 from deeptutor.services.auth.config import AuthConfig
@@ -220,6 +220,11 @@ def build_http_app(
     limiter = SlidingWindowRateLimiter()
     body_limit = max_request_bytes()
 
+    async def login_page(request):
+        from .auth_page import HTML
+
+        return HTMLResponse(HTML)
+
     async def healthz(request):
         return JSONResponse({"ok": True, "data": {"status": "ok"}, "error": None})
 
@@ -334,6 +339,8 @@ def build_http_app(
 
     return Starlette(
         routes=[
+            Route("/", login_page, methods=["GET"]),
+            Route("/login", login_page, methods=["GET"]),
             Route("/healthz", healthz, methods=["GET"]),
             Route("/readyz", readyz, methods=["GET"]),
             Route("/v1/auth/register", register, methods=["POST"]),
