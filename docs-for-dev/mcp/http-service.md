@@ -167,3 +167,14 @@ scripts/mcp_http_smoke.py:
 见 `deploy/env/mcp.example.env`、`deploy/env/postgres.example.env`。最小集合：
 `DATABASE_URL`（deeptutor_app 角色）、`S3_*`、`DEEPTUTOR_JWT_SECRET`、
 `DEEPTUTOR_PUBLIC_BASE_URL=https://...`、`DEEPTUTOR_TOKEN_ISSUER`。
+
+## 11. T4 教学媒体（精读/视频课/数学动画/Hook）
+
+见 [`media-tools-contracts.md`](./media-tools-contracts.md)。要点：精读为有状态实时会话
+（0004 表：reading_materials/segments/sessions/messages），引用页码/章节/时间戳；
+视频课与 Manim 动画为异步媒体 Job（依赖门 + 503 `CAPABILITY_UNAVAILABLE`）；
+宿主 Hook 通过 `hook_event_submit` 幂等生成复习任务，无 Hook 时用
+`review_tasks_list` 轮询。生产精读回答器设 `DEEPTUTOR_READING_LLM=1`（模型凭据就绪时
+自动启用 LLM 综合，引用仍由服务端按检索段落附加，失败回落确定性检索）。
+运营统计：`GET /v1/ops/capability_stats`（`X-Ops-Token: $DEEPTUTOR_OPS_TOKEN`），
+含按能力的成功率、平均耗时、取消率、token/成本与 artifact 存储量、宿主渠道分布。

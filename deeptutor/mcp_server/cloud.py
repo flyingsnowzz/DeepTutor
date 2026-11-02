@@ -108,7 +108,12 @@ def build_cloud_app(
     sessions = PostgresSessionStore(engine)
     practice = PostgresPracticeRepository(engine)
     mastery = PostgresMasteryRepository(engine)
-    reading = ReadingService(engine, object_store=object_store)
+    reading_answerer = None
+    if os.environ.get("DEEPTUTOR_READING_LLM") == "1":
+        from deeptutor.services.reading.llm_answerer import LLMReadingAnswerer
+
+        reading_answerer = LLMReadingAnswerer()
+    reading = ReadingService(engine, object_store=object_store, answerer=reading_answerer)
     hooks = HookService(engine)
 
     recorder = JobQuotaRecorder(quota, audit)
