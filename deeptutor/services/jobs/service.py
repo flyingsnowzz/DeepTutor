@@ -44,6 +44,7 @@ class InMemoryJobService:
         capability: str,
         payload: dict[str, Any],
         idempotency_key: str | None = None,
+        source_channel: str = "first_party",
     ) -> JobRecord:
         if idempotency_key:
             dedupe_key = (owner_user_id, idempotency_key)
@@ -58,6 +59,7 @@ class InMemoryJobService:
             capability=capability,
             input=payload,
             idempotency_key=idempotency_key,
+            source_channel=source_channel,
             status="queued",
         )
         self._jobs[job.id] = job

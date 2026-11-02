@@ -6,13 +6,13 @@ from typing import Any, Awaitable, Callable
 
 from mcp.server.fastmcp import Context, FastMCP
 
-from deeptutor.modules.catalog import module_statuses
 from deeptutor.services.jobs.runner import DeterministicCapabilityRunner
 from deeptutor.services.jobs.service import InMemoryJobService, JobConflictError, JobNotFoundError
 from deeptutor.services.quota.plans import metric_for_capability
 from deeptutor.services.storage.object_store import InMemoryObjectStore, ObjectStore
 
 from .context import RequestPrincipal, new_request_id
+from .dependencies import media_dependencies
 from .errors import McpError, ok
 from .models import CAPABILITIES, MAX_INPUT_CHARS, MAX_OUTPUT_CHARS
 
@@ -67,6 +67,8 @@ def create_mcp_server(
     mastery_repo=None,
     quota=None,
     audit=None,
+    reading_service=None,
+    hook_service=None,
 ) -> FastMCP:
     store = object_store or InMemoryObjectStore()
     jobs = job_service or InMemoryJobService(store, runner=runner)
@@ -107,32 +109,21 @@ def create_mcp_server(
         ctx: Context, include_dependencies: bool = True, locale: str = "zh"
     ) -> dict:
         principal = await _principal(ctx)
-        module_ready = {item["id"]: item for item in module_statuses()}
+        deps = media_dependencies()
         data = []
         for name, meta in CAPABILITIES.items():
-            status = (
-                "ready"
-                if name
-                in {
-                    "visualize",
-                    "deep_research",
-                    "deep_question",
-                    "problem_solve",
-                    "quiz_judge",
-                    "audio_overview",
-                    "mastery_path",
-                }
-                else "missing_dependency"
-            )
+            dep = deps.get(name)
+            missing = list(meta.get("missing_dependencies", []))
+            if dep is not None:
+                missing = dep.missing
+            status = "ready" if not missing else "missing_dependency"
             data.append(
                 {
                     "name": name,
                     "display_name": meta["display_name"],
                     "status": status,
                     "supports_jobs": meta["supports_jobs"],
-                    "missing_dependencies": []
-                    if status == "ready"
-                    else meta.get("missing_dependencies", []),
+                    "missing_dependencies": missing,
                     "estimated_duration_sec": meta.get("estimated_duration_sec"),
                     "cost_hint": meta.get("cost_hint"),
                 }
@@ -146,6 +137,26 @@ def create_mcp_server(
     ) -> dict:
         principal = await _principal(ctx)
         _validate_submit(capability, raw_input, idempotency_key)
+
+        # Dependency gate: media renderers must report missing dependencies as a
+        # contract error instead of starting a job that cannot finish.
+        deps = media_dependencies().get(capability)
+        if deps is not None and not deps.ready:
+            await _audit(
+                ctx,
+                principal,
+                tool,
+                status="unavailable",
+                error_code="CAPABILITY_UNAVAILABLE",
+            )
+            raise McpError(
+                "CAPABILITY_UNAVAILABLE",
+                f"能力 {capability} 缺少运行依赖",
+                details={"capability": capability, "missing_dependencies": deps.missing},
+                http_status=503,
+            )
+
+        channel = str(raw_input.get("source_channel") or "mcp")[:48]
         if quota is not None:
             try:
                 await quota.assert_allowed(
@@ -174,6 +185,7 @@ def create_mcp_server(
             capability=capability,
             payload=raw_input,
             idempotency_key=idempotency_key,
+            source_channel=channel,
         )
         await _audit(ctx, principal, tool, job_id=job.id, status=job.status)
         return ok(
@@ -380,10 +392,6 @@ def create_mcp_server(
         await _audit(ctx, principal, "practice_queue_list")
         return ok({"items": items, "count": len(items)})
 
-    @mcp.tool(name="review_tasks_list")
-    async def review_tasks_list(ctx: Context, limit: int = 50) -> dict:
-        return await practice_queue_list(ctx, limit)
-
     @mcp.tool(name="practice_question_get")
     async def practice_question_get(ctx: Context, entry_id: str) -> dict:
         principal = await _principal(ctx)
@@ -487,6 +495,198 @@ def create_mcp_server(
             raise McpError("NOT_FOUND", "Mastery path not found.", http_status=404)
         await _audit(ctx, principal, "mastery_objective_get", resource_id=path_id)
         return ok(data)
+
+    # ------------------------------------------------------- reading sessions
+    def _require_reading():
+        if reading_service is None:
+            raise McpError("SERVICE_UNAVAILABLE", "Reading service is not configured.")
+        return reading_service
+
+    @mcp.tool(name="reading_material_register")
+    async def reading_material_register(
+        ctx: Context,
+        kind: str,
+        title: str,
+        content: str | None = None,
+        artifact_ref: str | None = None,
+    ) -> dict:
+        principal = await _principal(ctx)
+        service = _require_reading()
+        artifact_row = None
+        if artifact_ref:
+            try:
+                artifact_row = await jobs.get_artifact(
+                    artifact_ref=artifact_ref, owner_user_id=principal.owner_user_id
+                )
+            except JobNotFoundError:
+                raise McpError("NOT_FOUND", "Artifact not found.", http_status=404)
+        try:
+            result = await service.register_material(
+                principal.owner_user_id,
+                kind=kind,
+                title=title or "",
+                content=content,
+                artifact_ref=artifact_ref,
+                artifact_row=artifact_row,
+            )
+        except Exception as exc:  # noqa: BLE001
+            code = getattr(exc, "code", "MATERIAL_ERROR")
+            raise McpError(code, str(exc), http_status=getattr(exc, "http_status", 400))
+        await _audit(ctx, principal, "reading_material_register", resource_id=result["material_id"])
+        return ok(result)
+
+    @mcp.tool(name="reading_session_start")
+    async def reading_session_start(
+        ctx: Context, material_id: str, mode: str = "study", title: str = ""
+    ) -> dict:
+        principal = await _principal(ctx)
+        service = _require_reading()
+        try:
+            result = await service.start_session(
+                principal.owner_user_id, material_id=material_id, title=title, mode=mode
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise McpError(
+                getattr(exc, "code", "READING_ERROR"),
+                str(exc),
+                http_status=getattr(exc, "http_status", 400),
+            )
+        await _audit(ctx, principal, "reading_session_start", resource_id=result["session_id"])
+        return ok(result)
+
+    @mcp.tool(name="reading_session_reply")
+    async def reading_session_reply(
+        ctx: Context, session_id: str, message: str, mode: str | None = None
+    ) -> dict:
+        principal = await _principal(ctx)
+        service = _require_reading()
+        try:
+            result = await service.reply(
+                principal.owner_user_id,
+                session_id=session_id,
+                message=message,
+                mode=mode,
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise McpError(
+                getattr(exc, "code", "READING_ERROR"),
+                str(exc),
+                http_status=getattr(exc, "http_status", 400),
+            )
+        await _audit(ctx, principal, "reading_session_reply", resource_id=session_id)
+        return ok(result)
+
+    @mcp.tool(name="reading_sessions_list")
+    async def reading_sessions_list(ctx: Context, limit: int = 50) -> dict:
+        principal = await _principal(ctx)
+        service = _require_reading()
+        items = await service.list_sessions(principal.owner_user_id, min(max(limit, 1), 100))
+        return ok({"sessions": items, "count": len(items)})
+
+    # ------------------------------------------------------------- media jobs
+    @mcp.tool(name="lesson_video_generate_submit")
+    async def lesson_video_generate_submit(
+        ctx: Context, input: dict, idempotency_key: str | None = None, locale: str = "zh"
+    ) -> dict:
+        result = await _submit(
+            ctx, "video_lesson", input, idempotency_key, "lesson_video_generate_submit"
+        )
+        result["data"]["billing"]["notice"] = "渲染约 2–8 分钟，按 TTS/模型用量计费；可取消。"
+        return result
+
+    @mcp.tool(name="lesson_video_generate_get")
+    async def lesson_video_generate_get(ctx: Context, job_id: str) -> dict:
+        return await capability_job_get(ctx, job_id)
+
+    @mcp.tool(name="math_animation_generate_submit")
+    async def math_animation_generate_submit(
+        ctx: Context, input: dict, idempotency_key: str | None = None, locale: str = "zh"
+    ) -> dict:
+        result = await _submit(
+            ctx, "math_animator", input, idempotency_key, "math_animation_generate_submit"
+        )
+        result["data"]["billing"]["notice"] = (
+            "Manim/LaTeX/ffmpeg 渲染约 1–5 分钟；缺依赖时返回 CAPABILITY_UNAVAILABLE。"
+        )
+        return result
+
+    @mcp.tool(name="math_animation_generate_get")
+    async def math_animation_generate_get(ctx: Context, job_id: str) -> dict:
+        return await capability_job_get(ctx, job_id)
+
+    # -------------------------------------------------------- hooks & reviews
+    def _require_hook():
+        if hook_service is None:
+            raise McpError("SERVICE_UNAVAILABLE", "Hook service is not configured.")
+        return hook_service
+
+    @mcp.tool(name="hook_event_submit")
+    async def hook_event_submit(
+        ctx: Context,
+        event_type: str,
+        idempotency_key: str,
+        source_ref: str = "",
+        channel: str = "unknown",
+        payload: dict | None = None,
+    ) -> dict:
+        principal = await _principal(ctx)
+        service = _require_hook()
+        try:
+            result = await service.deliver(
+                principal.owner_user_id,
+                event_type=event_type,
+                idempotency_key=idempotency_key,
+                source_ref=source_ref,
+                channel=channel or "unknown",
+                payload=payload,
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise McpError(
+                getattr(exc, "code", "HOOK_ERROR"),
+                str(exc),
+                http_status=getattr(exc, "http_status", 400),
+            )
+        await _audit(
+            ctx,
+            principal,
+            "hook_event_submit",
+            resource_id=result["delivery_id"],
+            usage={"event": event_type, "replayed": result["replayed"]},
+        )
+        return ok(result)
+
+    @mcp.tool(name="hook_deliveries_list")
+    async def hook_deliveries_list(ctx: Context, limit: int = 50) -> dict:
+        principal = await _principal(ctx)
+        service = _require_hook()
+        items = await service.list_deliveries(principal.owner_user_id, min(max(limit, 1), 100))
+        return ok({"deliveries": items, "count": len(items)})
+
+    @mcp.tool(name="review_tasks_list")
+    async def review_tasks_list(ctx: Context, limit: int = 50) -> dict:
+        """Follow-up review tasks (polling fallback when host hooks are absent)."""
+        principal = await _principal(ctx)
+        service = _require_hook()
+        items = await service._review_tasks.list_due(
+            principal.owner_user_id, min(max(limit, 1), 100)
+        )
+        return ok({"tasks": items, "count": len(items)})
+
+    @mcp.tool(name="review_task_complete")
+    async def review_task_complete(
+        ctx: Context, review_task_id: str, result: dict | None = None
+    ) -> dict:
+        principal = await _principal(ctx)
+        service = _require_hook()
+        outcome = await service._review_tasks.complete(
+            principal.owner_user_id, review_task_id, result=result
+        )
+        if outcome is None:
+            raise McpError(
+                "NOT_FOUND", "Review task not found or already completed.", http_status=404
+            )
+        await _audit(ctx, principal, "review_task_complete", resource_id=review_task_id)
+        return ok(outcome)
 
     # T0 error contract: tool failures return the JSON envelope
     # {"ok": false, "data": null, "error": {...}} instead of MCP-native

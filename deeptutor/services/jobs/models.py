@@ -32,6 +32,7 @@ class JobRecord:
     input: dict[str, Any]
     status: JobStatus
     idempotency_key: str | None = None
+    source_channel: str = "first_party"
     result: dict[str, Any] | None = None
     error: dict[str, Any] | None = None
     artifacts: list[ArtifactRecord] = field(default_factory=list)
@@ -45,6 +46,7 @@ class JobRecord:
             "job_id": self.id,
             "session_id": self.session_id,
             "status": self.status,
+            "source_channel": self.source_channel,
             "progress": None,
             "result": self.result,
             "artifacts": [

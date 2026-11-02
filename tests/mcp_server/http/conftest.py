@@ -27,6 +27,9 @@ from deeptutor.services.storage.object_store import InMemoryObjectStore
 TEST_SECRET = "http-test-secret-0123456789-abcdef-0123456789"
 
 
+OPS_TOKEN = "test-ops-token"
+
+
 def _free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -38,6 +41,7 @@ def base_url():
     if not os.environ.get("DATABASE_URL"):
         pytest.skip("DATABASE_URL not set")
     port = _free_port()
+    os.environ["DEEPTUTOR_OPS_TOKEN"] = OPS_TOKEN
     config = AuthConfig(
         jwt_secret=TEST_SECRET,
         issuer="deeptutor-test",

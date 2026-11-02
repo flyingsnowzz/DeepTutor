@@ -16,11 +16,13 @@ from deeptutor.services.accounts.service import AccountService
 from deeptutor.services.audit import AuditService
 from deeptutor.services.auth.config import AuthConfig, load_auth_config
 from deeptutor.services.auth.service import AuthService
+from deeptutor.services.hooks import HookService
 from deeptutor.services.jobs.postgres import PostgresJobService
 from deeptutor.services.postgres.database import create_engine
 from deeptutor.services.practice.postgres import PostgresPracticeRepository
 from deeptutor.services.quota.plans import metric_for_capability
 from deeptutor.services.quota.service import QuotaService
+from deeptutor.services.reading.service import ReadingService
 from deeptutor.services.session.postgres_store import PostgresSessionStore
 from deeptutor.services.storage.object_store import ObjectStore
 
@@ -106,6 +108,8 @@ def build_cloud_app(
     sessions = PostgresSessionStore(engine)
     practice = PostgresPracticeRepository(engine)
     mastery = PostgresMasteryRepository(engine)
+    reading = ReadingService(engine, object_store=object_store)
+    hooks = HookService(engine)
 
     recorder = JobQuotaRecorder(quota, audit)
     jobs = PostgresJobService(
@@ -124,6 +128,8 @@ def build_cloud_app(
         mastery_repo=mastery,
         quota=quota,
         audit=audit,
+        reading_service=reading,
+        hook_service=hooks,
     )
 
     async def readiness_check() -> None:
@@ -139,6 +145,7 @@ def build_cloud_app(
         config=config,
         mcp=mcp,
         readiness_check=readiness_check,
+        engine=engine,
     )
     app.state.engine = engine
     app.state.auth = auth
@@ -148,5 +155,7 @@ def build_cloud_app(
     app.state.sessions = sessions
     app.state.practice = practice
     app.state.mastery = mastery
+    app.state.reading = reading
+    app.state.hooks = hooks
     app.state.jobs = jobs
     return app

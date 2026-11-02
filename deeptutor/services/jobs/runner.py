@@ -140,4 +140,54 @@ class DeterministicCapabilityRunner:
                     "total_tokens": 14,
                 },
             )
+        if capability == "video_lesson":
+            data = b"RIFF" + b"\x00" * 60
+            return CapabilityRunResult(
+                result={
+                    "video_ready": False,
+                    "render_type": "placeholder",
+                    "note": "视频课渲染占位；真实环境经 Remotion/TTS 渲染为 mp4（约 2-8 分钟）。",
+                },
+                artifacts=[
+                    {
+                        "key_suffix": "lesson.mp4",
+                        "data": data,
+                        "kind": "video_lesson",
+                        "mime_type": "video/mp4",
+                        "filename": "lesson.mp4",
+                    }
+                ],
+                usage={
+                    "provider": "deterministic",
+                    "model": "fake",
+                    "prompt_tokens": 10,
+                    "completion_tokens": 20,
+                    "total_tokens": 30,
+                },
+            )
+        if capability == "math_animator":
+            scene = "# Manim placeholder scene; real render needs manim/LaTeX/ffmpeg"
+            return CapabilityRunResult(
+                result={
+                    "video_ready": False,
+                    "render_type": "placeholder",
+                    "note": "数学动画渲染占位；真实环境经 Manim 渲染为 mp4（约 1-5 分钟）。",
+                },
+                artifacts=[
+                    {
+                        "key_suffix": "scene.py",
+                        "data": scene.encode(),
+                        "kind": "math_animation_source",
+                        "mime_type": "text/x-python",
+                        "filename": "scene.py",
+                    }
+                ],
+                usage={
+                    "provider": "deterministic",
+                    "model": "fake",
+                    "prompt_tokens": 8,
+                    "completion_tokens": 16,
+                    "total_tokens": 24,
+                },
+            )
         raise ValueError(f"Unsupported capability: {capability}")

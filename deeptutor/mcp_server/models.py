@@ -14,6 +14,9 @@ CapabilityName = Literal[
     "quiz_judge",
     "audio_overview",
     "mastery_path",
+    "video_lesson",
+    "math_animator",
+    "immersive_reading",
 ]
 
 MAX_INPUT_CHARS = 16_000
@@ -70,6 +73,37 @@ CAPABILITIES: dict[str, dict[str, Any]] = {
         "estimated_duration_sec": 60,
         "missing_dependencies": [],
         "cost_hint": {"meter": "mastery", "billed_event": "job_succeeded"},
+    },
+    "video_lesson": {
+        "display_name": "视频课",
+        "supports_jobs": True,
+        "estimated_duration_sec": 300,
+        "missing_dependencies": [],
+        "cost_hint": {
+            "meter": "media",
+            "billed_event": "job_succeeded",
+            "media": True,
+            "notice": "渲染耗时约 2–8 分钟，按 TTS/模型用量计费",
+        },
+    },
+    "math_animator": {
+        "display_name": "数学动画",
+        "supports_jobs": True,
+        "estimated_duration_sec": 240,
+        "missing_dependencies": [],
+        "cost_hint": {
+            "meter": "media",
+            "billed_event": "job_succeeded",
+            "media": True,
+            "notice": "Manim/LaTeX/ffmpeg 渲染耗时约 1–5 分钟",
+        },
+    },
+    "immersive_reading": {
+        "display_name": "沉浸式精读",
+        "supports_jobs": False,
+        "estimated_duration_sec": 0,
+        "missing_dependencies": [],
+        "cost_hint": {"meter": "practice", "billed_event": "per_reply"},
     },
 }
 

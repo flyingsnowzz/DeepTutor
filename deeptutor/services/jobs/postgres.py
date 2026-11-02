@@ -91,6 +91,7 @@ class PostgresJobService:
         capability: str,
         payload: dict[str, Any],
         idempotency_key: str | None = None,
+        source_channel: str = "first_party",
     ) -> JobRecord:
         async with self._session() as db:
             await self._ensure_owner(db, owner_user_id)
@@ -112,16 +113,17 @@ class PostgresJobService:
                 text(
                     """INSERT INTO jobs
                     (id, owner_user_id, session_id, capability, idempotency_key,
-                     status, input_json, started_at, created_at, updated_at)
+                     status, input_json, source_channel, started_at, created_at, updated_at)
                     VALUES
                     (:id,:owner,:session_id,:capability,:idem,
-                     'running',:input,now(),now(),now())"""
+                     'running',:input,:channel,now(),now(),now())"""
                 ),
                 {
                     "id": job_id,
                     "owner": owner_user_id,
                     "session_id": session_id,
                     "capability": capability,
+                    "channel": source_channel[:48],
                     "idem": idempotency_key,
                     "input": json.dumps(payload, ensure_ascii=False),
                 },

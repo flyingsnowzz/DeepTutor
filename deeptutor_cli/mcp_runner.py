@@ -62,6 +62,9 @@ class TurnCapabilityRunner:
         )
 
     def _artifacts_from_result(self, capability: str, result: dict[str, Any]):
+        if capability in {"video_lesson", "math_animator"}:
+            yield from self._media_artifacts(capability)
+            return
         if capability != "visualize":
             return []
         payload = result.get("payload") or {}
@@ -79,3 +82,34 @@ class TurnCapabilityRunner:
             "mime_type": mime_type,
             "filename": suffix,
         }
+
+    def _media_artifacts(self, capability: str):
+        """Best-effort collection of rendered media from the agent workdir.
+
+        Real video/animation turns write mp4 files under the capability agent
+        directory; the object-store boundary must never see server paths, so
+        only file bytes cross it. Returns nothing when no render exists
+        (failures stay in the job result/error).
+        """
+
+        from deeptutor.services.path_service import get_path_service
+
+        kind = "video_lesson" if capability == "video_lesson" else "math_animator"
+        workdir = get_path_service().get_agent_dir(kind)
+        if not workdir.exists():
+            return
+        candidates = sorted(
+            (p for p in workdir.rglob("*.mp4") if p.is_file()),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        for path in candidates[:2]:
+            if path.stat().st_size == 0:
+                continue
+            yield {
+                "key_suffix": path.name,
+                "data": path.read_bytes(),
+                "kind": kind,
+                "mime_type": "video/mp4",
+                "filename": path.name,
+            }

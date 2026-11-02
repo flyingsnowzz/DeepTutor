@@ -216,6 +216,7 @@ def build_http_app(
     config: AuthConfig,
     mcp,
     readiness_check=None,
+    engine=None,
 ) -> Starlette:
     limiter = SlidingWindowRateLimiter()
     body_limit = max_request_bytes()
@@ -309,6 +310,16 @@ def build_http_app(
             return envelope_error("INVALID_ARGUMENT", "请求体不是合法 JSON", status=400)
         return JSONResponse({"ok": True, "data": {"revoked": revoked}, "error": None})
 
+    async def ops_stats(request):
+        from .ops import capability_stats, ops_token_valid
+
+        token = request.headers.get("x-ops-token", "")
+        if not ops_token_valid(token):
+            return envelope_error("FORBIDDEN", "需要内部运营令牌", status=403)
+        if engine is None:
+            return envelope_error("SERVICE_UNAVAILABLE", "stats engine not configured", status=503)
+        return JSONResponse({"ok": True, "data": await capability_stats(engine), "error": None})
+
     async def plans(request):
         public = {}
         for plan, periods in PLAN_LIMITS.items():
@@ -348,6 +359,7 @@ def build_http_app(
             Route("/v1/auth/refresh", refresh, methods=["POST"]),
             Route("/v1/auth/revoke", revoke, methods=["POST"]),
             Route("/v1/billing/plans", plans, methods=["GET"]),
+            Route("/v1/ops/capability_stats", ops_stats, methods=["GET"]),
             # The MCP streamable app owns /mcp internally; mount it last so the
             # explicit routes above take precedence.
             Mount("/", app=mcp_http_app),
