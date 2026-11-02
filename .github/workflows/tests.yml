@@ -390,12 +390,23 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://deeptutor:deeptutor@127.0.0.1:5432/deeptutor
         run: alembic upgrade head
 
+      - name: Create restricted application role (RLS defense-in-depth)
+        env:
+          PGPASSWORD: deeptutor
+        run: |
+          psql -h 127.0.0.1 -U deeptutor -d deeptutor -f deploy/postgres/init/01_app_role.sql
+          # The CI deeptutor role is the service superuser; set the app role password.
+          psql -h 127.0.0.1 -U deeptutor -d deeptutor -c "ALTER ROLE deeptutor_app PASSWORD 'appdev';"
+
       - name: Run Postgres platform integration tests
         env:
           PYTHONPATH: ${{ github.workspace }}
           DATABASE_URL: postgresql+asyncpg://deeptutor:deeptutor@127.0.0.1:5432/deeptutor
+          DEEPTUTOR_ALLOW_DEV_SECRET: "1"
         run: |
-          pytest -q tests/services/postgres tests/services/jobs             tests/learning/postgres tests/migration tests/mcp_server
+          pytest -q tests/services/postgres tests/services/jobs \
+            tests/services/auth tests/services/quota \
+            tests/learning/postgres tests/migration tests/mcp_server
 
   video-lesson-sandbox:
     name: Video lesson isolation (${{ matrix.os }})

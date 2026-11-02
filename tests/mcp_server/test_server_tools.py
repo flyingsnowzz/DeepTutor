@@ -65,15 +65,17 @@ async def test_visualize_submit_get_artifact_flow():
 @pytest.mark.asyncio
 async def test_unsupported_capability_rejected():
     server = create_mcp_server(owner_user_id="user-a")
-    with pytest.raises(Exception):
-        await _call(
-            server,
-            "capability_run_submit",
-            {
-                "capability": "chat",
-                "input": {"prompt": "hello"},
-            },
-        )
+    result = await _call(
+        server,
+        "capability_run_submit",
+        {
+            "capability": "chat",
+            "input": {"prompt": "hello"},
+        },
+    )
+    # T0 error contract: stable JSON envelope instead of a thrown exception.
+    assert result["ok"] is False
+    assert result["error"]["code"] == "UNSUPPORTED_CAPABILITY"
 
 
 @pytest.mark.asyncio

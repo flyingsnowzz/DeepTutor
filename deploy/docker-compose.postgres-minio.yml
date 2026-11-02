@@ -15,6 +15,9 @@ services:
       retries: 20
     volumes:
       - deeptutor_mcp_postgres:/var/lib/postgresql/data
+      # Creates the restricted deeptutor_app role on first database init.
+      # On an existing volume apply deploy/postgres/init/01_app_role.sql manually.
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
 
   minio:
     profiles: ["minio"]

@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from ..storage.object_store import InMemoryObjectStore, ObjectStore
+from .artifacts import validate_artifact
 from .models import ArtifactRecord, JobRecord
 from .runner import CapabilityRunner, DeterministicCapabilityRunner
 from .service import JobConflictError, JobNotFoundError
@@ -40,7 +41,12 @@ class PostgresJobService:
         engine: AsyncEngine | None = None,
         object_store: ObjectStore | None = None,
         runner: CapabilityRunner | None = None,
+        terminal_listener=None,
     ):
+        # Called once after a job reaches a terminal state: (job, outcome|None,
+        # error|None). Used by the cloud service for idempotent quota metering;
+        # listener errors never change the persisted job state.
+        self._terminal_listener = terminal_listener
         if engine is not None:
             self._engine = engine
             self._owns_engine = False
@@ -136,11 +142,14 @@ class PostgresJobService:
 
     async def _run(self, job_id: str, owner_user_id: str) -> None:
         job = await self._get_owned(job_id, owner_user_id)
+        terminal_outcome = None
+        terminal_error = None
         try:
             outcome = await self.runner.run(capability=job.capability, payload=job.input)
             artifacts: list[ArtifactRecord] = []
             for item in outcome.artifacts:
                 data = item["data"]
+                validate_artifact(mime_type=item["mime_type"], size_bytes=len(data))
                 key = item.get("key") or f"{owner_user_id}/{job_id}/{item['key_suffix']}"
                 stored = await self.object_store.put(key, data, item["mime_type"])
                 artifact = ArtifactRecord(
@@ -211,6 +220,7 @@ class PostgresJobService:
                         },
                     )
                 await db.commit()
+                terminal_outcome = outcome
         except asyncio.CancelledError:
             await self._set_terminal(
                 job_id,
@@ -218,16 +228,19 @@ class PostgresJobService:
                 "canceled",
                 {"code": "JOB_CANCELED", "message": "Job canceled", "retryable": False},
             )
+            terminal_error = {"code": "JOB_CANCELED", "message": "Job canceled"}
             raise
         except Exception as exc:  # noqa: BLE001
-            await self._set_terminal(
-                job_id,
-                owner_user_id,
-                "failed",
-                {"code": "JOB_FAILED", "message": str(exc), "retryable": False},
-            )
+            terminal_error = {"code": "JOB_FAILED", "message": str(exc), "retryable": False}
+            await self._set_terminal(job_id, owner_user_id, "failed", terminal_error)
         finally:
             self._tasks.pop(job_id, None)
+            if self._terminal_listener is not None:
+                try:
+                    final_job = await self._get_owned(job_id, owner_user_id)
+                    await self._terminal_listener(final_job, terminal_outcome, terminal_error)
+                except Exception:  # noqa: BLE001
+                    pass
 
     async def _set_terminal(self, job_id: str, owner: str, status: str, error: dict) -> None:
         async with self._session() as db:

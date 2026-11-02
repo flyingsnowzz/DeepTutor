@@ -185,3 +185,58 @@ class PostgresMasteryRepository:
                 {"path_id": r["path_id"], "revision": r["revision"], "state": dict(r["state_json"])}
                 for r in rows
             ]
+
+    # ----------------------------------------------------------------- T3 reads
+    async def get_map(self, owner_user_id: str, path_id: str) -> dict[str, Any] | None:
+        """Map view: aggregate state plus interaction/evidence counts."""
+        async with self._sessions() as db:
+            row = (
+                (
+                    await db.execute(
+                        text(
+                            """SELECT p.revision, p.state_json,
+                                  (SELECT count(*) FROM mastery_interactions i
+                                     WHERE i.owner_user_id=p.owner_user_id AND i.path_id=p.path_id) AS interactions,
+                                  (SELECT count(*) FROM mastery_interactions i
+                                     WHERE i.owner_user_id=p.owner_user_id AND i.path_id=p.path_id
+                                       AND i.status='correct') AS correct,
+                                  (SELECT count(*) FROM mastery_events e
+                                     WHERE e.owner_user_id=p.owner_user_id AND e.path_id=p.path_id) AS events
+                           FROM mastery_paths p
+                           WHERE p.path_id=:path AND p.owner_user_id=:owner"""
+                        ),
+                        {"path": path_id, "owner": owner_user_id},
+                    )
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                return None
+            state = dict(row["state_json"])
+            return {
+                "path_id": path_id,
+                "revision": row["revision"],
+                "state": state,
+                "objective": self._objective_from_state(state),
+                "stats": {
+                    "interactions": row["interactions"],
+                    "correct": row["correct"],
+                    "events": row["events"],
+                },
+            }
+
+    async def get_objective(self, owner_user_id: str, path_id: str) -> dict[str, Any] | None:
+        state = await self.load_path(owner_user_id, path_id)
+        if state is None:
+            return None
+        return {"path_id": path_id, **self._objective_from_state(state)}
+
+    @staticmethod
+    def _objective_from_state(state: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "goal": state.get("goal") or state.get("objective") or state.get("topic") or "",
+            "description": state.get("description", ""),
+            "emoji": state.get("emoji", ""),
+            "status": state.get("status", ""),
+        }

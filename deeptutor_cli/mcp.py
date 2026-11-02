@@ -10,35 +10,53 @@ app = typer.Typer(
 )
 
 
+def _runner(deterministic: bool):
+    if deterministic:
+        return None
+    from .mcp_runner import TurnCapabilityRunner
+
+    return TurnCapabilityRunner()
+
+
 @app.command("serve")
 def serve(
-    transport: str = typer.Option(
-        "stdio", "--transport", help="Transport: stdio (T1); http arrives in T3."
-    ),
+    transport: str = typer.Option("stdio", "--transport", help="Transport: stdio or http."),
     host: str = typer.Option("127.0.0.1", "--host"),
     port: int = typer.Option(8001, "--port"),
 ) -> None:
-    """Start the external MCP server."""
-    from deeptutor.mcp_server.factory import build_runtime_services
-    from deeptutor.mcp_server.server import create_mcp_server
-
-    from .mcp_runner import TurnCapabilityRunner
-
-    if transport != "stdio":
-        raise typer.BadParameter("T1 supports only --transport stdio; HTTP arrives in T3.")
+    """Start the external MCP server (stdio or streamable HTTP)."""
     deterministic = os.environ.get("DEEPTUTOR_MCP_DETERMINISTIC", "").lower() in {
         "1",
         "true",
         "yes",
     }
-    runner = None if deterministic else TurnCapabilityRunner()
-    jobs, store = build_runtime_services(runner=runner)
-    server = create_mcp_server(
-        owner_user_id="local-dev-user",
-        job_service=jobs,
-        object_store=store,
-    )
-    asyncio.run(server.run_stdio_async())
+    if transport == "stdio":
+        from deeptutor.mcp_server.factory import build_runtime_services
+        from deeptutor.mcp_server.server import create_mcp_server
+
+        jobs, store = build_runtime_services(runner=_runner(deterministic))
+        server = create_mcp_server(
+            owner_user_id="local-dev-user",
+            job_service=jobs,
+            object_store=store,
+        )
+        asyncio.run(server.run_stdio_async())
+        return
+
+    if transport == "http":
+        import uvicorn
+
+        from deeptutor.mcp_server.cloud import build_cloud_app
+        from deeptutor.mcp_server.factory import _build_object_store
+
+        http_app = build_cloud_app(
+            object_store=_build_object_store(),
+            runner=_runner(deterministic),
+        )
+        uvicorn.run(http_app, host=host, port=port, log_level=os.environ.get("LOG_LEVEL", "info"))
+        return
+
+    raise typer.BadParameter("transport must be 'stdio' or 'http'")
 
 
 def main() -> None:  # pragma: no cover

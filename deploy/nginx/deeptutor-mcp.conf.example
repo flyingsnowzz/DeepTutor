@@ -1,0 +1,46 @@
+# DeepTutor cloud MCP — nginx HTTPS reverse proxy example.
+# TLS terminates here; the app listens on 127.0.0.1:8001 (HTTP only).
+
+# Required for streamed MCP responses and large initialize payloads.
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      "";
+}
+
+upstream deeptutor_mcp {
+    server 127.0.0.1:8001;
+    keepalive 16;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name mcp.deeptutor.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/mcp.deeptutor.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/mcp.deeptutor.example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    # Client IP (rate limiting/audit) + HTTPS awareness.
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header Host              $host;
+    proxy_set_header Connection        $connection_upgrade;
+
+    # MCP streamable HTTP uses long-lived POST responses (SSE).
+    proxy_buffering off;
+    proxy_read_timeout 900s;
+    client_max_body_size 2m;
+
+    location / {
+        proxy_pass http://deeptutor_mcp;
+    }
+
+    location = /healthz { proxy_pass http://deeptutor_mcp; access_log off; }
+    location = /readyz  { proxy_pass http://deeptutor_mcp; access_log off; }
+}
+
+server {
+    listen 80;
+    server_name mcp.deeptutor.example.com;
+    return 301 https://$host$request_uri;
+}

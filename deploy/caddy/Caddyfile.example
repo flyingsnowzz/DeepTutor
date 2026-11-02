@@ -1,0 +1,16 @@
+# DeepTutor cloud MCP — Caddy example (automatic HTTPS).
+# Run the app with --host 127.0.0.1 --port 8001.
+
+mcp.deeptutor.example.com {
+	reverse_proxy 127.0.0.1:8001 {
+		flush_interval -1
+		transport http {
+			read_timeout 900s
+		}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto https
+	}
+	request_body {
+		max_size 2MB
+	}
+}

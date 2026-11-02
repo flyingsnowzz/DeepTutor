@@ -1,19 +1,26 @@
-"""Stable MCP-facing error codes for T1."""
+"""Stable MCP-facing error codes and the unified response envelope."""
 
 from __future__ import annotations
 
 
 class McpError(Exception):
-    """Expected error that can be shown to an MCP caller."""
+    """Expected error that can be shown to an MCP/HTTP caller."""
 
     def __init__(
-        self, code: str, message: str, *, retryable: bool = False, details: dict | None = None
+        self,
+        code: str,
+        message: str,
+        *,
+        retryable: bool = False,
+        details: dict | None = None,
+        http_status: int = 400,
     ):
         super().__init__(message)
         self.code = code
         self.message = message
         self.retryable = retryable
         self.details = details or {}
+        self.http_status = http_status
 
     def to_dict(self) -> dict:
         return {

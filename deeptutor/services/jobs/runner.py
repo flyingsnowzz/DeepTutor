@@ -62,6 +62,82 @@ class DeterministicCapabilityRunner:
             return CapabilityRunResult(
                 result={"questions": [], "note": "Quiz generation executor placeholder."},
                 artifacts=[],
-                usage={},
+                usage={
+                    "provider": "deterministic",
+                    "model": "fake",
+                    "prompt_tokens": 4,
+                    "completion_tokens": 8,
+                    "total_tokens": 12,
+                },
+            )
+        if capability == "problem_solve":
+            return CapabilityRunResult(
+                result={
+                    "steps": [{"index": 1, "title": "审题", "body": prompt[:200]}],
+                    "final_answer": "",
+                    "similar_practice": [],
+                    "note": "Step-by-step solve executor placeholder.",
+                },
+                artifacts=[],
+                usage={
+                    "provider": "deterministic",
+                    "model": "fake",
+                    "prompt_tokens": 6,
+                    "completion_tokens": 12,
+                    "total_tokens": 18,
+                },
+            )
+        if capability == "quiz_judge":
+            return CapabilityRunResult(
+                result={
+                    "score": None,
+                    "verdict": "formative_feedback_only",
+                    "feedback": "主观题判分执行器占位；结果仅作形成性反馈，不代表官方评分。",
+                },
+                artifacts=[],
+                usage={
+                    "provider": "deterministic",
+                    "model": "fake",
+                    "prompt_tokens": 6,
+                    "completion_tokens": 10,
+                    "total_tokens": 16,
+                },
+            )
+        if capability == "audio_overview":
+            transcript = f"音频导学（占位）：{prompt[:300]}"
+            return CapabilityRunResult(
+                result={
+                    "audio_ready": False,
+                    "transcript": transcript,
+                    "note": "Audio overview executor placeholder (media pipeline lands in T4).",
+                },
+                artifacts=[
+                    {
+                        "key_suffix": "overview.txt",
+                        "data": transcript.encode(),
+                        "kind": "audio_transcript",
+                        "mime_type": "text/plain",
+                        "filename": "overview.txt",
+                    }
+                ],
+                usage={
+                    "provider": "deterministic",
+                    "model": "fake",
+                    "prompt_tokens": 8,
+                    "completion_tokens": 16,
+                    "total_tokens": 24,
+                },
+            )
+        if capability == "mastery_path":
+            return CapabilityRunResult(
+                result={"path": None, "note": "Mastery path generation executor placeholder."},
+                artifacts=[],
+                usage={
+                    "provider": "deterministic",
+                    "model": "fake",
+                    "prompt_tokens": 5,
+                    "completion_tokens": 9,
+                    "total_tokens": 14,
+                },
             )
         raise ValueError(f"Unsupported capability: {capability}")

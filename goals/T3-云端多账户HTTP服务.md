@@ -181,16 +181,46 @@ deeptutor mcp serve --transport http --host 0.0.0.0 --port 8001
 
 ## 完成标准
 
-- [ ] `/mcp` 可通过 HTTPS 反向代理访问。
-- [ ] 未认证调用返回标准 401 流程。
-- [ ] 两个不同账户无法读取彼此 job、artifact、practice、mastery 数据。
-- [ ] 幂等重试不重复扣额度、不重复计分。
-- [ ] 超额调用被正确拒绝并给出升级提示。
-- [ ] Postgres 备份可在干净环境恢复。
-- [ ] 对象存储链接短期有效且不能越权访问。
-- [ ] 新业务路径无 SQLite 写入。
-- [ ] 关键接口具备限流、审计和 request id。
-- [ ] 至少完成一次真实外部宿主联调。
+- [x] `/mcp` 可通过 HTTPS 反向代理访问（streamable HTTP；nginx/Caddy 示例在 `deploy/`，TLS 在代理层终结）。
+- [x] 未认证调用返回标准 401 流程（`WWW-Authenticate: Bearer` + 登录/注册 URL；`/v1/auth/*` 注册/登录/轮换/吊销）。
+- [x] 两个不同账户无法读取彼此 job、artifact、practice、mastery 数据（HTTP 集成测试 + RLS 策略双重验证）。
+- [x] 幂等重试不重复扣额度、不重复计分（`quota_ledger` 唯一键：`job:<id>` / `practice:<owner>:<request_id>`；练习台账重放返回首次结果）。
+- [x] 超额调用被正确拒绝并给出升级提示（429 `QUOTA_EXCEEDED` + upgrade_url，免费版 media=3 测试覆盖）。
+- [x] Postgres 备份可在干净环境恢复（0003 schema `pg_dump -Fc` → 新库：6 张新表、20 条 RLS 策略、版本号一致）。
+- [x] 对象存储链接短期有效且不能越权访问（900 秒预签名；B 账户取 A 产物返回 NOT_FOUND；MIME/大小校验）。
+- [x] 新业务路径无 SQLite 写入（T2 `test_platform_no_sqlite` 持续有效；HTTP 仅复用同一平台层）。
+- [x] 关键接口具备限流（20/120 次/分钟）、审计（`audit_events`）和 request id（`X-Request-ID` 响应头）。
+- [x] 至少完成一次真实外部宿主联调（`scripts/mcp_http_smoke.py` 使用官方 `mcp.client.streamable_http` 客户端全流程通过）。
+
+## 验证证据（2026-11-02）
+
+```text
+# 迁移
+alembic upgrade head => 0003_auth_quota；base→head 全周期 downgrade/upgrade 通过
+新增表：password_credentials / refresh_tokens / quota_counters /
+        quota_ledger / audit_events / practice_ledger
+RLS：20 张个人表 owner_isolation 策略；受限角色 deeptutor_app 实测隔离
+
+# 测试（86 项，全部真实 Postgres/LocalStack）
+pytest tests/services/{postgres,jobs,storage,auth,quota}        tests/learning/postgres tests/migration tests/mcp_server -q
+=> 86 passed（含 HTTP 端到端 14 项：401/注册登录/刷新轮换盗用吊销/
+   A-B 作业+产物+练习+掌握路径隔离/额度超限/限流/请求体上限/审计/request id）
+
+# 真实外部宿主联调（官方 streamable HTTP MCP 客户端）
+scripts/mcp_http_smoke.py =>
+  401 flow / register-login / refresh rotation + reuse revoke /
+  authenticated MCP job + artifact / cross-account isolation /
+  learning-state tools  => status=passed
+
+# stdio 回归
+mcp_stdio_deterministic_smoke / mcp_stdio_research_cancel 通过
+
+# 备份恢复
+pg_dump -Fc → 新库 pg_restore：auth_tables=6、rls_policies=20、
+alembic_version=0003_auth_quota，源/恢复一致
+
+# 闸门：ruff check/format、check_architecture、import-linter（3 契约）、git diff --check
+```
 
 ## Codex 实施任务
 
