@@ -1,9 +1,107 @@
 {
   "capability": "video_lesson",
-  "job_id": "job_382074112a634111bd068f462141a320",
-  "status": "failed",
-  "error": "{\"code\": \"JOB_FAILED\", \"message\": \"\", \"retryable\": false}",
-  "input": "{\"prompt\": \"生成约 8 秒、只有 2 个简洁场景的立方体体积视频课，展示 V=a³ 和 3³=27。\"}",
-  "created_at": "2026-11-03 04:27:08.491180+00:00",
-  "finished_at": "2026-11-03 04:42:08.510263+00:00"
+  "status": "succeeded",
+  "elapsed_seconds": 27.372,
+  "placeholder_detected": false,
+  "submit": {
+    "ok": true,
+    "data": {
+      "job_id": "job_76051b6a694742a8abb28a284c66eda9",
+      "session_id": "sess_a6defe935e54461eb9acfe4ed10d5d6d",
+      "status": "running",
+      "poll_after_ms": 1000,
+      "billing": {
+        "meter": "practice",
+        "charged_on": "job_succeeded",
+        "idempotency": "same idempotency_key never charges twice"
+      }
+    },
+    "error": null
+  },
+  "final": {
+    "ok": true,
+    "data": {
+      "job_id": "job_76051b6a694742a8abb28a284c66eda9",
+      "session_id": "sess_a6defe935e54461eb9acfe4ed10d5d6d",
+      "status": "succeeded",
+      "source_channel": "first_party",
+      "progress": null,
+      "result": {
+        "response": "用两个简洁场景说明立方体体积公式 V=a³，并演示 a=3 时的计算 3³=27。",
+        "title": "立方体体积公式 V=a³（8秒速览）",
+        "artifacts": [
+          {
+            "type": "html",
+            "url": "/files/outputs/workspace/chat/video_lesson/turn_1793686653444_d0c1c7dfa9/artifacts/lesson.html",
+            "filename": "lesson.html",
+            "content_type": "text/html",
+            "label": "立方体体积公式 V=a³（8秒速览）"
+          }
+        ],
+        "code": {
+          "language": "tsx",
+          "content": "import React from 'react';\nimport {Stage, Title, Body, Card, Formula, Scenes, lessonLength} from './kit';\n\nconst scenes = [\n{voice: \"scene-1\", frames: 150, content: (<Stage eyebrow={\"立方体体积公式 V=a³（8秒速览）\"}><Title x={120} y={150} w={1500} size={72}>{\"认识立方体体积\"}</Title><Body x={120} y={300} w={1200} size={38}><p>\"立方体：长=宽=高=边长 a\"</p><p>\"体积=底面积×高=a²×a\"</p><p>\"公式：V=a³\"</p></Body><Card x={120} y={560} w={900} title={\"核心公式\"}><Formula>{\"V = a^3\"}</Formula></Card></Stage>)},\n{voice: \"scene-2\", frames: 150, content: (<Stage eyebrow={\"立方体体积公式 V=a³（8秒速览）\"}><Title x={120} y={150} w={1500} size={72}>{\"例题：a=3 时\"}</Title><Body x={120} y={300} w={1200} size={38}><p>\"代入：V=3³\"</p><p>\"计算：3×3×3=27\"</p><p>\"结论：V=27\"</p></Body><Card x={120} y={560} w={900} title={\"核心公式\"}><Formula>{\"V = 3^3 = 27\"}</Formula></Card></Stage>)},\n];\n\nexport const LESSON = {durationInFrames: lessonLength(scenes), fps: 30, width: 1920, height: 1080};\n\nexport function Lesson() {\n  return <Scenes scenes={scenes} />;\n}\n"
+        },
+        "render": {
+          "attempts": [],
+          "duration_seconds": 13,
+          "narrated": true
+        },
+        "timings": {
+          "code_generation": 0.0,
+          "render_check": 0.0
+        },
+        "metadata": {
+          "usage_summary": {
+            "prompt_tokens": 176,
+            "completion_tokens": 466,
+            "total_tokens": 642,
+            "cache_read_input_tokens": 128,
+            "cache_creation_input_tokens": 0,
+            "reasoning_tokens": 0,
+            "duration_seconds": 17.39347283400275,
+            "total_calls": 1,
+            "cache_reported_calls": 1,
+            "cache_input_tokens": 176,
+            "cache_hit_rate": 0.7272727272727273,
+            "ttft_seconds": 3.2913173750057467,
+            "ttft_calls": 1,
+            "generation_seconds": 14.095827041994198,
+            "timed_completion_tokens": 466,
+            "tokens_per_second": 33.059429475950274,
+            "estimated_calls": 0,
+            "call_details": [
+              {
+                "call_id": "1d7bc4e6d12d4a089e5042fe2e0244fb",
+                "prompt_tokens": 176,
+                "completion_tokens": 466,
+                "total_tokens": 642,
+                "cache_read_input_tokens": 128,
+                "model": "spark-x2.6",
+                "provider": "OpenAICompatProvider",
+                "status": "completed",
+                "estimated": false,
+                "duration_seconds": 17.39347283400275,
+                "ttft_seconds": 3.2913173750057467,
+                "generation_seconds": 14.095827041994198,
+                "tokens_per_second": 33.059429475950274,
+                "cache_hit_rate": 0.7272727272727273
+              }
+            ]
+          }
+        }
+      },
+      "artifacts": [
+        {
+          "artifact_ref": "art_a977dc8714f04e4694a822f8e1d1b64f",
+          "kind": "video_lesson",
+          "mime_type": "application/zip",
+          "title": "lesson.zip"
+        }
+      ],
+      "needs_input": null,
+      "error": null
+    },
+    "error": null
+  }
 }

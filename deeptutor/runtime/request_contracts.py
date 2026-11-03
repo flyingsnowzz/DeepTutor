@@ -32,8 +32,12 @@ class ImmersiveReadingRequestConfig(EmptyConfig):
     pass
 
 
-class VideoLessonRequestConfig(EmptyConfig):
-    pass
+class VideoLessonRequestConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # MCP defaults to the bounded structured path for reliable headless jobs;
+    # the first-party UI may still request freeform Remotion authoring.
+    generation_mode: Literal["freeform", "storyboard"] = "freeform"
 
 
 class DeepQuestionRequestConfig(BaseModel):

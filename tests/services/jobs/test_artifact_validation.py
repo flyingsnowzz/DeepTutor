@@ -9,7 +9,15 @@ from deeptutor.services.jobs.artifacts import (
 
 @pytest.mark.parametrize(
     "mime",
-    ["text/plain", "text/vnd.mermaid", "image/png", "audio/mpeg", "video/mp4", "application/pdf"],
+    [
+        "text/plain",
+        "text/vnd.mermaid",
+        "image/png",
+        "audio/mpeg",
+        "video/mp4",
+        "application/pdf",
+        "application/zip",
+    ],
 )
 def test_allowed_mime_types(mime):
     validate_artifact(mime_type=mime, size_bytes=10)

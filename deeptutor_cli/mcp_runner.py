@@ -9,9 +9,11 @@ tests; this adapter always represents real capability execution.
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 from pathlib import Path
 from typing import Any
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from deeptutor.services.jobs.runner import CapabilityRunResult
 
@@ -114,6 +116,12 @@ class TurnCapabilityRunner:
         config = payload.get("config") if isinstance(payload.get("config"), dict) else {}
         if capability == "deep_research":
             config = {"mode": "notes", "depth": "quick", **config}
+            config.setdefault(
+                "confirmed_outline",
+                [{"title": str(payload.get("prompt") or "学习主题").strip()[:80]}],
+            )
+        if capability == "video_lesson":
+            config = {"generation_mode": "storyboard", **config}
         request = TurnRequest(
             content=str(payload.get("prompt", "")),
             capability=capability,
@@ -268,11 +276,22 @@ class TurnCapabilityRunner:
 
             root = get_path_service().get_agent_dir("video_lesson") / turn["id"] / "artifacts"
             for item in result.get("artifacts") or []:
-                yield from self._file_artifact(
-                    root / str(item.get("filename") or "lesson.html"),
-                    "video_lesson",
-                    item.get("content_type") or "text/html",
-                )
+                path = root / str(item.get("filename") or "lesson.html")
+                mime_type = item.get("content_type") or "text/html"
+                if mime_type == "text/html" and path.is_file() and path.stat().st_size:
+                    archive_name = f"{path.stem}.zip"
+                    buffer = io.BytesIO()
+                    with ZipFile(buffer, "w", compression=ZIP_DEFLATED) as archive:
+                        archive.write(path, arcname=path.name)
+                    yield {
+                        "key_suffix": archive_name,
+                        "data": buffer.getvalue(),
+                        "kind": "video_lesson",
+                        "mime_type": "application/zip",
+                        "filename": archive_name,
+                    }
+                else:
+                    yield from self._file_artifact(path, "video_lesson", mime_type)
             return
 
         if capability == "math_animator":

@@ -35,6 +35,7 @@ import asyncio
 from collections.abc import Awaitable
 from dataclasses import dataclass, replace
 import html
+import json
 import logging
 from pathlib import Path
 import re
@@ -467,6 +468,13 @@ class ResearchPipeline:
         )
         self.execution_mode = str(researching.get("execution_mode", "parallel"))
         self.research_mode = str(reporting.get("mode", "report"))
+        self.research_depth = str(self.runtime_config.get("intent", {}).get("depth", ""))
+        if self.research_depth == "quick":
+            # Headless quick research is a bounded learner brief, not a full
+            # literature sprint. Keep one slow retrieval from consuming the
+            # whole job when local RAG/search is already expected to be fast.
+            self.tool_timeout = min(self.tool_timeout, 90)
+        self._last_report_degraded = False
 
         self.queue_max_length = _read_int(
             queue_cfg, key="max_length", default=DEFAULT_QUEUE_MAX_LENGTH
@@ -713,6 +721,7 @@ class ResearchPipeline:
                 "block_count": len(researched),
                 "citation_count": len(citations.get_all_citations()),
                 "partial": bool(incomplete),
+                "degraded": bool(getattr(self, "_last_report_degraded", False)),
                 "failed_block_count": len(incomplete),
                 "failed_block_titles": failed_block_titles,
             },
@@ -960,9 +969,13 @@ class ResearchPipeline:
         block_tool_names = self._block_tool_names()
         native_block_tools = self._use_native_block_tools(block_tool_names)
         prompt_tool_names = block_tool_names if native_block_tools else []
-        effective_max_iterations = (
-            max(self.block_max_iterations, 4) if prompt_tool_names else self.block_max_iterations
-        )
+        effective_max_iterations = self.block_max_iterations
+        if prompt_tool_names and self.research_depth != "quick":
+            # The 4-loop floor gives standard/deep research enough turns for
+            # search → fetch → RAG → synthesis. Quick research explicitly asks
+            # for one bounded block, so enforcing four turns makes it slow
+            # without making it deeper.
+            effective_max_iterations = max(self.block_max_iterations, 4)
         tool_schemas = (
             self._build_block_tool_schemas(prompt_tool_names) if native_block_tools else None
         )
@@ -1013,6 +1026,15 @@ class ResearchPipeline:
             context=context,
             client=client,
         )
+
+        quick_kb_evidence = await self._prefetch_quick_kb_evidence(
+            block=block, host=host
+        )
+        if quick_kb_evidence is not None:
+            block.iteration_count = 1
+            queue.mark_completed(block.block_id)
+            return ResearchedBlock(block=block, knowledge=quick_kb_evidence)
+
         try:
             outcome = await run_agentic_loop(
                 initial_messages=messages,
@@ -1043,6 +1065,61 @@ class ResearchPipeline:
             queue.mark_failed(block.block_id)
         block.iteration_count = outcome.iterations
         return ResearchedBlock(block=block, knowledge=knowledge)
+
+    async def _prefetch_quick_kb_evidence(
+        self,
+        *,
+        block: TopicBlock,
+        host: "_BlockLoopHost",
+    ) -> str | None:
+        """Retrieve attached-KB evidence deterministically for quick jobs.
+
+        A reasoning model can emit ``FINISH`` on the one iteration allowed to
+        quick research and bypass the RAG tool. For an attached KB that would
+        turn "research this knowledge base" into unsupported model knowledge.
+        Run DeepTutor's retrieval first, let the normal citation pipeline
+        record it, and synthesize from that evidence in the reporting stage.
+        """
+        if (
+            self.research_depth != "quick"
+            or not self.kb_name
+            or self._is_obsidian_kb
+            or getattr(self, "_pageindex_tool_context", None) is not None
+        ):
+            return None
+        available_tools = self._block_tool_names()
+        if "rag" not in available_tools or not self._use_native_block_tools(["rag"]):
+            return None
+
+        query = "\n".join(
+            str(part) for part in (block.sub_topic, block.overview) if str(part).strip()
+        ) or block.sub_topic
+        outcome = await host.dispatch_tools(
+            iteration=0,
+            tool_calls=[
+                {
+                    "id": f"forced-{block.block_id}-rag",
+                    "name": "rag",
+                    "arguments": json.dumps(
+                        {"query": query[:2000], "kb_name": self.kb_name},
+                        ensure_ascii=False,
+                    ),
+                }
+            ],
+        )
+        evidence = "\n\n".join(
+            str(message.get("content") or "").strip()
+            for message in outcome.tool_messages
+            if str(message.get("content") or "").strip()
+        )
+        if not evidence:
+            raise RuntimeError(
+                "quick research attached knowledge base "
+                f"{self.kb_name!r}, but RAG returned no evidence"
+            )
+        # Citation traces and manager state were populated by host; the caller
+        # marks the queue completed before returning this pre-fetched block.
+        return evidence
 
     async def _force_finish_block(
         self,
@@ -1326,6 +1403,8 @@ class ResearchPipeline:
             )
 
         section_texts: list[str] = []
+        degraded = False
+        self._last_report_degraded = False
 
         # Emit the report's H1 title before the introduction so the rendered
         # markdown opens with the report name, then the numbered ``## 1.``
@@ -1348,11 +1427,16 @@ class ResearchPipeline:
         if section_texts:
             await self._stream_report_separator(stream)
         try:
-            intro = await self._write_intro(
-                topic=topic, outline=outline, stream=stream, client=client
+            intro = await self._report_step_with_budget(
+                lambda: self._write_intro(
+                    topic=topic, outline=outline, stream=stream, client=client
+                )
             )
         except Exception as exc:
-            raise incomplete_error(0) from exc
+            if self.research_depth != "quick":
+                raise incomplete_error(0) from exc
+            degraded = True
+            intro = self._fallback_report_intro(topic=topic, outline=outline)
         if intro:
             section_texts.append(intro)
 
@@ -1361,20 +1445,29 @@ class ResearchPipeline:
             if section_texts:
                 await self._stream_report_separator(stream)
             try:
-                body = await self._write_section(
-                    section=section,
-                    section_index=section_index,
-                    section_count=section_count,
-                    section_number=section_index + 1,
-                    topic=topic,
-                    outline=outline,
-                    blocks=blocks,
-                    citations=citations,
-                    stream=stream,
-                    client=client,
+                body = await self._report_step_with_budget(
+                    lambda section=section, section_index=section_index: self._write_section(
+                        section=section,
+                        section_index=section_index,
+                        section_count=section_count,
+                        section_number=section_index + 1,
+                        topic=topic,
+                        outline=outline,
+                        blocks=blocks,
+                        citations=citations,
+                        stream=stream,
+                        client=client,
+                    )
                 )
             except Exception as exc:
-                raise incomplete_error(section_index) from exc
+                if self.research_depth != "quick":
+                    raise incomplete_error(section_index) from exc
+                degraded = True
+                body = self._fallback_report_section(
+                    section=section,
+                    section_number=section_index + 1,
+                    blocks=blocks,
+                )
             if body:
                 section_texts.append(body)
                 section_bodies.append(body)
@@ -1382,19 +1475,29 @@ class ResearchPipeline:
         if section_texts:
             await self._stream_report_separator(stream)
         try:
-            conclusion = await self._write_conclusion(
-                topic=topic,
-                outline=outline,
-                section_bodies=section_bodies,
-                section_number=conclusion_number,
-                stream=stream,
-                client=client,
+            conclusion = await self._report_step_with_budget(
+                lambda: self._write_conclusion(
+                    topic=topic,
+                    outline=outline,
+                    section_bodies=section_bodies,
+                    section_number=conclusion_number,
+                    stream=stream,
+                    client=client,
+                )
             )
         except Exception as exc:
-            raise incomplete_error(section_count + 1) from exc
+            if self.research_depth != "quick":
+                raise incomplete_error(section_count + 1) from exc
+            degraded = True
+            conclusion = self._fallback_report_conclusion(
+                topic=topic,
+                outline=outline,
+                section_number=conclusion_number,
+            )
         if conclusion:
             section_texts.append(conclusion)
 
+        self._last_report_degraded = degraded
         body = self._normalise_report_markdown(
             "\n\n".join(part for part in section_texts if part.strip()),
             citations,
@@ -2003,6 +2106,52 @@ class ResearchPipeline:
         raise RuntimeError(
             f"Research report step {call_id_root!r} remained incomplete after "
             f"{DEFAULT_REPORT_STEP_MAX_ATTEMPTS} attempts ({last_reason})."
+        )
+
+    async def _report_step_with_budget(self, factory):
+        if self.research_depth == "quick":
+            return await asyncio.wait_for(factory(), timeout=90)
+        return await factory()
+
+    @staticmethod
+    def _fallback_report_intro(*, topic: str, outline: ReportOutline) -> str:
+        sections = "、".join(section.title for section in outline.sections)
+        return (
+            "## 1. 引言\n\n"
+            f"本报告围绕“{topic}”整理研究结论与教学建议。"
+            f"全文重点包括：{sections}。"
+        )
+
+    @staticmethod
+    def _fallback_report_section(
+        *, section: ReportSectionPlan, section_number: int, blocks: list[ResearchedBlock]
+    ) -> str:
+        selected = section.block_ids or tuple(rb.block.block_id for rb in blocks)
+        by_id = {rb.block.block_id: rb for rb in blocks}
+        parts = [f"## {section_number}. {section.title}"]
+        if section.intent:
+            parts.append(section.intent)
+        for block_id in selected:
+            rb = by_id.get(block_id)
+            if rb is None:
+                continue
+            evidence = (rb.knowledge or "").strip()
+            if not evidence:
+                evidence = "\n\n".join(
+                    (trace.summary or "").strip()
+                    for trace in rb.block.tool_traces
+                    if (trace.summary or "").strip()
+                )
+            if evidence:
+                parts.append(evidence[:3000])
+        return "\n\n".join(parts)
+
+    @staticmethod
+    def _fallback_report_conclusion(*, topic: str, outline: ReportOutline, section_number: int) -> str:
+        return (
+            f"## {section_number}. 总结\n\n"
+            f"以上各节围绕“{topic}”整理了概念、证据、易错点和教学应用。"
+            "实际教学时应以具体例子和操作活动验证理解，避免只记忆公式。"
         )
 
     def _render_section_evidence(

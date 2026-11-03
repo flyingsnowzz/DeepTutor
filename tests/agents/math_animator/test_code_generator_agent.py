@@ -133,7 +133,7 @@ async def test_truncated_generation_grows_the_budget_and_asks_for_less_reasoning
     # configured one so the request stays inside the model's own output limit.
     assert [call["max_tokens"] for call in calls] == [8000, 12000, 16000]
     assert [call["reasoning_effort"] for call in calls] == [
-        None,
+        RETRY_REASONING_EFFORT,
         RETRY_REASONING_EFFORT,
         RETRY_REASONING_EFFORT,
     ]
@@ -194,7 +194,10 @@ async def test_truncated_reasoning_only_response_recovers_with_less_reasoning(
         )
 
     assert generated.code == "from manim import Scene"
-    assert [call["reasoning_effort"] for call in calls] == [None, RETRY_REASONING_EFFORT]
+    assert [call["reasoning_effort"] for call in calls] == [
+        RETRY_REASONING_EFFORT,
+        RETRY_REASONING_EFFORT,
+    ]
     assert [call["max_tokens"] for call in calls] == [8000, 12000]
 
 

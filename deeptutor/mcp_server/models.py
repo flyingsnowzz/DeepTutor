@@ -77,13 +77,13 @@ CAPABILITIES: dict[str, dict[str, Any]] = {
     "video_lesson": {
         "display_name": "视频课",
         "supports_jobs": True,
-        "estimated_duration_sec": 300,
+        "estimated_duration_sec": 120,
         "missing_dependencies": [],
         "cost_hint": {
             "meter": "media",
             "billed_event": "job_succeeded",
             "media": True,
-            "notice": "渲染耗时约 2–8 分钟，按 TTS/模型用量计费",
+            "notice": "结构化视频课通常约 30 秒–数分钟，按 TTS/模型用量计费；成功产物为可浏览器播放的课程 ZIP",
         },
     },
     "math_animator": {

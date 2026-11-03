@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+
 import pytest
 
 from deeptutor.agents.video_lesson.lesson_writer import LessonWriterAgent, parse_draft
@@ -44,6 +46,27 @@ def test_writer_agent_starts_a_conversation_with_the_kit(monkeypatch: pytest.Mon
     system, user = agent._messages
     assert "export const Stage" in system["content"]
     assert "Explain a cobweb plot" in user["content"]
+
+
+@pytest.mark.asyncio
+async def test_storyboard_parser_accepts_inline_reasoning_preamble() -> None:
+    agent = LessonWriterAgent(api_key="test", base_url="http://localhost", language="zh")
+    raw = (
+        '<think>先规划场景</think>'
+        '{"title":"立方体体积","summary":"体积公式导学",'
+        '"scenes":[{"heading":"公式","bullets":["V=a³"],"formula":"V=a³",'
+        '"narration":"体积等于棱长三次方。"}]}'
+    )
+
+    async def fake_stream(**kwargs) -> AsyncIterator[str]:
+        yield raw
+
+    agent.stream_llm = fake_stream
+    draft = await agent.write_storyboard(user_input="讲立方体体积", history="")
+
+    assert draft.title == "立方体体积"
+    assert draft.narration[0].text == "体积等于棱长三次方。"
+    assert "export const LESSON" in draft.code
 
 
 def test_parse_draft_reads_the_narration() -> None:

@@ -100,6 +100,8 @@ class LessonWriterAgent(BaseAgent):
             system_prompt="",
             messages=self._messages,
             stage="code_generation",
+            reasoning_effort="low",
+            max_tokens=8000,
             trace_meta=build_trace_metadata(
                 call_id=new_call_id("video-lesson"),
                 phase="code_generation",
@@ -112,6 +114,42 @@ class LessonWriterAgent(BaseAgent):
         ):
             chunks.append(chunk)
         return parse_draft("".join(chunks))
+
+    async def write_storyboard(self, *, user_input: str, history: str) -> LessonDraft:
+        """Generate content JSON instead of relying on a full freeform TSX response."""
+        from deeptutor.agents._shared.json_output import extract_json_object
+
+        from .storyboard import storyboard_tsx
+
+        user = (
+            "请为以下教学视频生成结构化分镜 JSON。只输出一个 JSON 对象，不要解释或输出代码。\n"
+            "格式：{\"title\":\"...\",\"summary\":\"...\","
+            "\"scenes\":[{\"heading\":\"...\",\"bullets\":[\"...\"],"
+            "\"formula\":\"...\",\"narration\":\"...\"}]}。\n"
+            "场景 2-4 个，每个场景聚焦一个概念；bullets 不超过 4 条，旁白简洁自然。\n\n"
+            f"用户需求：{user_input.strip()}\n\n历史上下文：{history.strip() or '-'}"
+        )
+        chunks: list[str] = []
+        async for chunk in self.stream_llm(
+            user_prompt=user,
+            system_prompt="你是 DeepTutor 的教学分镜设计器，严格输出合法 JSON。",
+            reasoning_effort="low",
+            max_tokens=4000,
+            stage="code_generation",
+        ):
+            chunks.append(chunk)
+        # Some OpenAI-compatible reasoning endpoints return no content when
+        # response_format=json_object is set. Plain JSON plus the shared robust
+        # parser also handles an inline <think> preamble and fenced output.
+        storyboard = extract_json_object("".join(chunks))
+        code, narration = storyboard_tsx(storyboard)
+        return LessonDraft(
+            title=str(storyboard.get("title") or "教学视频"),
+            summary=str(storyboard.get("summary") or ""),
+            code=code,
+            raw=json.dumps(storyboard, ensure_ascii=False),
+            narration=narration,
+        )
 
     async def process(self, *, attempt: int = 1) -> LessonDraft:
         return await self.write(attempt=attempt)

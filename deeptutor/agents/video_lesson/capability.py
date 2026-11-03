@@ -15,7 +15,7 @@ from deeptutor.runtime.agentic.usage import UsageTracker
 from deeptutor.runtime.bootstrap.builtin_capabilities import builtin_capability_manifest
 from deeptutor.runtime.stream_bus import StreamBus
 
-MAX_ATTEMPTS = 3
+MAX_ATTEMPTS = 1
 
 
 class VideoLessonCapability(TurnCapability):
@@ -58,8 +58,10 @@ class VideoLessonCapability(TurnCapability):
         attempts: list[dict[str, Any]] = []
         draft = None
         build = None
+        generation_mode = str(context.config_overrides.get("generation_mode") or "freeform")
         try:
-            for attempt in range(1, MAX_ATTEMPTS + 1):
+            freeform_attempts = range(1, MAX_ATTEMPTS + 1) if generation_mode != "storyboard" else ()
+            for attempt in freeform_attempts:
                 started = time.perf_counter()
                 async with stream.stage("code_generation", source=self.name):
                     await stream.progress(
@@ -125,17 +127,34 @@ class VideoLessonCapability(TurnCapability):
                     metadata={"trace_layer": "raw"},
                 )
                 writer.add_feedback(previous=draft.raw, stage=build.stage, errors=build.errors)
+            if draft is None or build is None or not build.ok:
+                last = attempts[-1]["errors"] if attempts else []
+                # Structured path: the model supplies teaching content, while
+                # DeepTutor owns the complete TSX template. MCP uses this path
+                # directly; first-party freeform generation retains it as a fallback.
+                storyboard_draft = await writer.write_storyboard(
+                    user_input=context.user_message, history=history
+                )
+                clips, _ = await asyncio.gather(
+                    narrate(storyboard_draft.narration, context.language, voice_cache), runtime_ready
+                )
+                narrated = any(clip.audio for clip in clips.values())
+                lesson = prepare_workdir(
+                    base_dir / "source",
+                    storyboard_draft.code,
+                    voice=voice_module(clips),
+                )
+                build = await build_lesson(lesson, base_dir / "source" / "player.js")
+                if not build.ok:
+                    raise RuntimeError(
+                        f"The video lesson did not pass its checks after {MAX_ATTEMPTS} attempts: "
+                        + "; ".join(last[:3] + build.errors[:3])
+                    )
+                draft = storyboard_draft
         finally:
             if not runtime_ready.done():
                 runtime_ready.cancel()
             await asyncio.gather(runtime_ready, return_exceptions=True)
-
-        if draft is None or build is None or not build.ok:
-            last = attempts[-1]["errors"] if attempts else []
-            raise RuntimeError(
-                f"The video lesson did not pass its checks after {MAX_ATTEMPTS} attempts: "
-                + "; ".join(last[:3])
-            )
 
         async with stream.stage("render_output", source=self.name):
             title = draft.title or context.user_message.strip()[:60]

@@ -10,7 +10,7 @@ submit ──▶ queued/running ──轮询──▶ succeeded / failed / cance
 ```
 
 1. 调用对应 `*_submit`（或通用 `capability_run_submit`），必带 `idempotency_key`。
-2. 从返回取 `job_id`、`status`、`billing`；提交前若 `cost_hint.notice` 存在，先用一句话告知预计耗时与“成功后计费”（视频约 2–8 分钟、动画约 1–5 分钟、音频约 1–3 分钟）。
+2. 从返回取 `job_id`、`status`、`billing`；提交前若 `cost_hint.notice` 存在，先用一句话告知预计耗时与“成功后计费”（结构化视频课约 30 秒–数分钟、动画约 1–5 分钟、音频约 1–3 分钟）。
 3. 用 `*_get` / `capability_job_get` 轮询：
    - 节奏：第 1 次 1–2 秒，之后指数退避到 5–10 秒；
    - 上限：连续等待约 10 分钟仍未结束，告知用户可稍后回来查询，并给出可继续的说法，不要无限轮询；
@@ -33,13 +33,13 @@ submit ──▶ queued/running ──轮询──▶ succeeded / failed / cance
 
 | 作业 | 预计耗时 | 成功产物 |
 | --- | --- | --- |
-| deep_research | 约 30–90 秒 | 研究报告文本 |
+| deep_research | 约 2–8 分钟 | 研究报告文本；附加知识库时包含引用 |
 | visualize | 约 10–30 秒 | Mermaid/文本 artifact |
 | deep_question | 约 20–40 秒 | 题目；生产环境会写入练习库 |
 | problem_solve | 约 30–60 秒 | 分步解答+同类练习 |
 | quiz_judge | 约 20–40 秒 | 形成性反馈（非官方分数） |
 | audio_overview | 约 1–3 分钟 | 音频 + 逐字稿 |
-| video_lesson | 约 2–8 分钟 | video/mp4 |
+| video_lesson | 约 30 秒–数分钟 | `application/zip`，解压后为可在浏览器播放的 `lesson.html` |
 | math_animator | 约 1–5 分钟 | video/mp4（缺 Manim/LaTeX/ffmpeg 时 503） |
 
 ## 状态展示话术

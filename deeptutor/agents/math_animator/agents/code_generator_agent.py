@@ -186,7 +186,7 @@ class CodeGeneratorAgent(BaseAgent):
                 system_prompt=system_prompt,
                 response_format={"type": "json_object"},
                 max_tokens=max_tokens or None,
-                reasoning_effort=(RETRY_REASONING_EFFORT if structured_attempt else None),
+                reasoning_effort="low",
                 stage=stage,
                 trace_meta=build_trace_metadata(
                     call_id=new_call_id(call_id_prefix),

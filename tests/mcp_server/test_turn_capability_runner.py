@@ -70,7 +70,11 @@ async def test_research_auto_confirms_outline_and_runs_report(monkeypatch):
     monkeypatch.setattr("deeptutor.app.DeepTutorApp", lambda: app)
 
     outcome = await TurnCapabilityRunner().run(
-        capability="deep_research", payload={"prompt": "research cube volume"}
+        capability="deep_research",
+        payload={
+            "prompt": "research cube volume",
+            "config": {"confirmed_outline": None},
+        },
     )
 
     assert len(app.requests) == 2
@@ -79,6 +83,22 @@ async def test_research_auto_confirms_outline_and_runs_report(monkeypatch):
         {"title": "formula", "overview": "V=a³"}
     ]
     assert outcome.result["response"] == "full research report"
+
+
+@pytest.mark.asyncio
+async def test_headless_quick_research_starts_with_one_confirmed_topic(monkeypatch):
+    app = FakeApp([[result_event({"response": "full research report"}), done_event()]])
+    monkeypatch.setattr("deeptutor.app.DeepTutorApp", lambda: app)
+
+    await TurnCapabilityRunner().run(
+        capability="deep_research", payload={"prompt": "research cube volume"}
+    )
+
+    assert len(app.requests) == 1
+    assert app.requests[0].config["depth"] == "quick"
+    assert app.requests[0].config["confirmed_outline"] == [
+        {"title": "research cube volume"}
+    ]
 
 
 @pytest.mark.asyncio
@@ -232,3 +252,45 @@ async def test_workspace_item_uses_original_turn_workspace(monkeypatch, tmp_path
 
     assert outcome.artifacts[0]["data"] == b"real-audio"
     assert outcome.artifacts[0]["mime_type"] == "audio/mpeg"
+
+
+@pytest.mark.asyncio
+async def test_video_lesson_uses_storyboard_and_packages_html(monkeypatch, tmp_path):
+    from io import BytesIO
+    from zipfile import ZipFile
+
+    artifact_dir = tmp_path / "turn-0" / "artifacts"
+    artifact_dir.mkdir(parents=True)
+    (artifact_dir / "lesson.html").write_text("<html>real lesson</html>", encoding="utf-8")
+    app = FakeApp(
+        [
+            [
+                result_event(
+                    {
+                        "response": "lesson ready",
+                        "artifacts": [{"filename": "lesson.html", "content_type": "text/html"}],
+                    }
+                ),
+                done_event(),
+            ]
+        ]
+    )
+    monkeypatch.setattr("deeptutor.app.DeepTutorApp", lambda: app)
+
+    class Paths:
+        def get_agent_dir(self, capability):
+            assert capability == "video_lesson"
+            return tmp_path
+
+    monkeypatch.setattr("deeptutor.services.path_service.get_path_service", lambda: Paths())
+
+    outcome = await TurnCapabilityRunner().run(
+        capability="video_lesson", payload={"prompt": "teach cube volume"}
+    )
+
+    assert app.requests[0].config["generation_mode"] == "storyboard"
+    artifact = outcome.artifacts[0]
+    assert artifact["filename"] == "lesson.zip"
+    assert artifact["mime_type"] == "application/zip"
+    with ZipFile(BytesIO(artifact["data"])) as archive:
+        assert archive.read("lesson.html") == b"<html>real lesson</html>"

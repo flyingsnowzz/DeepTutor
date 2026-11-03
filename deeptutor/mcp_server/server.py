@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import logging
 from typing import Any, Awaitable, Callable
@@ -23,7 +24,82 @@ def _truncate(value: Any, limit: int = MAX_OUTPUT_CHARS) -> Any:
     text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, default=str)
     if len(text) <= limit:
         return value
-    return text[: limit - 80] + "\n…[truncated]"
+    marker = "\n…[truncated]"
+    if not isinstance(value, (dict, list)):
+        return text[: max(0, limit - len(marker))] + marker
+
+    # Keep the JSON contract intact. In particular, turning a whole job payload
+    # into a string makes ``data.status`` unreadable precisely when a real
+    # research report or render result is large enough to need truncation.
+    truncated = copy.deepcopy(value)
+    paths: list[tuple[str | int, ...]] = []
+
+    def drop_verbose_diagnostics(node: Any) -> None:
+        if isinstance(node, dict):
+            # Per-call token traces are diagnostic telemetry, not learning
+            # output. They can otherwise consume the whole response budget and
+            # cause the actual research report to be discarded.
+            node.pop("call_details", None)
+            for item in node.values():
+                drop_verbose_diagnostics(item)
+        elif isinstance(node, list):
+            for item in node:
+                drop_verbose_diagnostics(item)
+
+    drop_verbose_diagnostics(truncated)
+
+    def collect(node: Any, path: tuple[str | int, ...] = ()) -> None:
+        if isinstance(node, dict):
+            for key, item in node.items():
+                collect(item, (*path, key))
+        elif isinstance(node, list):
+            for index, item in enumerate(node):
+                collect(item, (*path, index))
+        elif isinstance(node, str):
+            paths.append(path)
+
+    def read(path: tuple[str | int, ...]) -> str:
+        node = truncated
+        for part in path:
+            node = node[part]
+        return node
+
+    def write(path: tuple[str | int, ...], item: str) -> None:
+        node = truncated
+        for part in path[:-1]:
+            node = node[part]
+        node[path[-1]] = item
+
+    collect(truncated)
+    protected_names = {
+        "job_id",
+        "session_id",
+        "status",
+        "artifact_ref",
+        "kind",
+        "mime_type",
+        "filename",
+        "title",
+    }
+    candidates = [path for path in paths if path[-1] not in protected_names]
+    # Secondary source/code/diagnostic strings yield before the primary answer.
+    candidates.sort(key=lambda item: (item[-1] == "response", -len(read(item))))
+    for path in candidates:
+        current_size = len(json.dumps(truncated, ensure_ascii=False, default=str))
+        if current_size <= limit:
+            break
+        original = read(path)
+        excess = current_size - limit
+        keep = max(0, len(original) - excess - len(marker))
+        while True:
+            write(path, original[:keep] + marker)
+            remaining = len(json.dumps(truncated, ensure_ascii=False, default=str)) - limit
+            # JSON escaping (for example the marker's newline) can make the
+            # serialized reduction slightly smaller than the raw character cut.
+            if remaining <= 0 or keep == 0:
+                break
+            keep = max(0, keep - remaining)
+    return truncated
 
 
 def _validate_submit(
@@ -628,7 +704,9 @@ def create_mcp_server(
         result = await _submit(
             ctx, "video_lesson", input, idempotency_key, "lesson_video_generate_submit"
         )
-        result["data"]["billing"]["notice"] = "渲染约 2–8 分钟，按 TTS/模型用量计费；可取消。"
+        result["data"]["billing"]["notice"] = (
+            "结构化视频课通常约 30 秒–数分钟，按 TTS/模型用量计费；成功产物为课程 ZIP，可取消。"
+        )
         return result
 
     @mcp.tool(name="lesson_video_generate_get")

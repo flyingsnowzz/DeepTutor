@@ -22,7 +22,7 @@
 | `problem_solve_submit` / `problem_solve_get` | problem_solve | 分步解题+同类题 |
 | `quiz_judge_submit` / `quiz_judge_get` | quiz_judge | 主观/图片题异步判分（形成性反馈） |
 | `audio_overview_generate_submit/get` | audio_overview | 音频导学+逐字稿；`input.knowledge_bases` 必填，需可用 TTS 与 host/expert 两种声音 |
-| `lesson_video_generate_submit/get` | video_lesson | Remotion 视频课（约 2–8 分钟） |
+| `lesson_video_generate_submit/get` | video_lesson | Remotion 交互式视频课；成功产物为 `lesson.zip`（内含浏览器播放的 `lesson.html`） |
 | `math_animation_generate_submit/get` | math_animator | Manim 动画（约 1–5 分钟） |
 | `mastery_path_generate_submit/get` | mastery_path | 掌握路径生成 |
 

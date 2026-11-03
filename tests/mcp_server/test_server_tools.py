@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from deeptutor.mcp_server.server import create_mcp_server
+from deeptutor.mcp_server.server import _truncate, create_mcp_server
 from deeptutor.services.jobs.service import InMemoryJobService
 from deeptutor.services.storage.object_store import InMemoryObjectStore
 
@@ -109,3 +109,50 @@ async def test_research_job_succeeds_with_deterministic_runner():
     )
     fetched = await wait_job_payload(server, submitted["data"]["job_id"])
     assert fetched["data"]["status"] == "succeeded"
+
+
+def test_truncating_large_job_result_preserves_job_envelope():
+    payload = {
+        "job_id": "job-large",
+        "status": "succeeded",
+        "result": {"response": "研究报告" * 4000},
+        "artifacts": [{"artifact_ref": "artifact-1", "kind": "report"}],
+        "error": None,
+    }
+
+    truncated = _truncate(payload)
+
+    assert isinstance(truncated, dict)
+    assert truncated["status"] == "succeeded"
+    assert truncated["artifacts"] == payload["artifacts"]
+    assert truncated["result"]["response"].endswith("…[truncated]")
+    assert len(json.dumps(truncated, ensure_ascii=False)) <= 8000
+
+
+def test_truncation_drops_verbose_usage_before_research_report():
+    report = "完整研究结论。" * 500
+    payload = {
+        "job_id": "job-research",
+        "status": "succeeded",
+        "result": {
+            "response": report,
+            "metadata": {
+                "citation_count": 2,
+                "usage_summary": {
+                    "call_details": [
+                        {"call_id": f"call-{index}", "diagnostic": "x" * 500}
+                        for index in range(20)
+                    ]
+                },
+            },
+        },
+        "artifacts": [],
+        "error": None,
+    }
+
+    truncated = _truncate(payload)
+
+    assert truncated["result"]["response"] == report
+    assert "call_details" not in truncated["result"]["metadata"]["usage_summary"]
+    assert truncated["result"]["metadata"]["citation_count"] == 2
+    assert len(json.dumps(truncated, ensure_ascii=False)) <= 8000

@@ -10,6 +10,7 @@ ALLOWED_MIME_TYPES = {
     "application/pdf",
     "application/json",
     "application/octet-stream",
+    "application/zip",
 }
 #: Active content that can execute when opened in a browser.
 BLOCKED_MIME_TYPES = {

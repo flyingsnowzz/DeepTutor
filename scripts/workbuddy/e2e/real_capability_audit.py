@@ -25,7 +25,10 @@ CASES = {
     "deep_research": {
         "prompt": "用快速研究模式，简要说明立方体体积公式 V=a³ 的含义，给出两点教学要点。",
         "config": {"mode": "notes", "depth": "quick"},
-        "timeout": 900,
+        # Mirrors TurnCapabilityRunner._CAPABILITY_TIMEOUTS: quick research is
+        # still a real retrieval/report pipeline and must not be killed before
+        # the service's own 20-minute timeout.
+        "timeout": 1200,
     },
     "visualize": {
         "prompt": "用 Mermaid 可视化讲解立方体体积 V=a³，必须包含棱长 a、单位小立方体堆叠和棱长 3 时体积 27。",

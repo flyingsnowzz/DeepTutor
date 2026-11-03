@@ -13,7 +13,7 @@
 
 ## 用户话术 C（视频课/数学动画）
 - 先查 capabilities_list：
-  - video_lesson ready → `lesson_video_generate_submit`（约 2–8 分钟），完成后 artifact_get 取 mp4 链接；
+  - video_lesson ready → `lesson_video_generate_submit`（结构化课程通常约 30 秒–数分钟），完成后 artifact_get 取 `lesson.zip` 链接；提醒用户解压后用浏览器打开 `lesson.html`，这不是 MP4；
   - math_animator 若 missing_dependency（Manim/LaTeX/ffmpeg）→ 明确告知暂不可用，不承诺、不假装；
 - 链接 15 分钟过期，提醒及时打开；可 `capability_job_cancel` 取消。
 
