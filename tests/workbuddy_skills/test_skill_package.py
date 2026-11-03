@@ -78,6 +78,7 @@ def test_zip_build(package_dir: Path, tmp_path: Path):
     with zipfile.ZipFile(dest) as archive:
         names = set(archive.namelist())
         assert "SKILL.md" in names
+        assert "README.md" in names
         assert any(n.startswith("references/") for n in names)
         assert any(n.startswith("listing/") for n in names)
         assert not any(n.endswith(".py") for n in names)

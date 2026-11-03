@@ -40,7 +40,7 @@ python scripts/release/validate_workbuddy_skill.py workbuddy-skills/deeptutor-le
 => PASS（15 个文本文件，0 errors）
 
 python scripts/release/build_workbuddy_skill_zip.py workbuddy-skills/deeptutor-learning dist/workbuddy-skills
-=> dist/workbuddy-skills/deeptutor-learning-0.1.0.zip（validated: true，24 个文件）
+=> dist/workbuddy-skills/deeptutor-learning-0.1.0.zip（validated: true，25 个文件（含 README））
 
 python -m pytest tests/workbuddy_skills -q
 => 8 passed（frontmatter、结构、敏感信息、工具名一致性、无脚本、zip 构建、负例）
@@ -86,6 +86,20 @@ python -m pytest tests/workbuddy_skills -q
   2. `DEEPTUTOR_MCP_DETERMINISTIC=1` 只返回占位内容，不调用真实模型。
   现已分别修正为项目根目录和 `DEEPTUTOR_MCP_DETERMINISTIC=0`。
 
+### Skill 安装、显式触发与真实桌面端对话
+
+| 验收项 | 证据 | 结果 |
+| --- | --- | --- |
+| 本地 Skill 安装与启用 | `skill-installed.png` | `~/.workbuddy/skills/deeptutor-learning` 出现在“已安装”，开关为启用 |
+| `/deeptutor-learning` 显式触发 | `skill-trigger-e2e.png` | Skill 标签被客户端正确识别；能力检查、复习队列、练习统计与记录查询成功 |
+| 完整“今日复习”对话 | `workbuddy-review-e2e-full.png`、`e2e/07-workbuddy-desktop-review.json` | `practice_summary_get` + `review_tasks_list` 返回真实统计，31 秒完成 |
+| WorkBuddy 宿主生成 5 题并写库 | `host-generated-practice-tools.png`、`host-generated-practice-e2e.png`、`e2e/08-workbuddy-skill-host-generated-practice.json` | 客户端明确显示“由我生成”，随后调用 `practice_entry_create`；PostgreSQL 查到对应 5 条 `skill_managed` 记录 |
+
+- 第 8 条场景同时验证了模型分工：未调用 `quiz_generate_submit`，没有让 DeepTutor
+  再生成一份题目；它只承担能力检查和练习入库。
+- 仅输入自然语言“今天复习什么？”时，WorkBuddy 可能先询问学习方向；因此上架示例和
+  README 使用明确的 `/deeptutor-learning ...` 触发方式，不把自然语言路由稳定性夸大成确定行为。
+
 ### 真实内容生产验证（不是 WorkBuddy 兜底生成）
 
 | 场景 | 证据 | 结果 |
@@ -100,10 +114,22 @@ python -m pytest tests/workbuddy_skills -q
 - 说明：前两次真实尝试曾出现模型规划/输出不完整，第三次完整链路成功。生产使用仍需
   关注模型输出稳定性与失败重试，不能把“管线接通”等同于“每次生成必然合格”。
 
+### 独立干净环境安装复核
+
+场景 09（`e2e/09-clean-environment-stdio.json`）使用全新 venv 和全新技能目录完成：
+
+1. 按 `requirements/core.txt` + `requirements/mcp.txt` 安装依赖，再以 `--no-deps` 安装当前源码；
+2. 将技能复制到独立 `workbuddy-home/skills/deeptutor-learning`，validator 通过；
+3. `pip check` 无损坏依赖；stdio `initialize`、`list_tools` 成功，共 39 个工具；
+4. `practice_summary_get` 成功返回当前账户 12 条练习。
+
+首次复核发现 `SQLAlchemy` 异步引擎缺少 `greenlet`，已将 `requirements/mcp.txt`
+修正为 `SQLAlchemy[asyncio]>=2.0.0` 后重新安装并验证通过。该记录证明 README 所述
+安装与联调路径可在无既有 Python 包的干净环境中复现；WorkBuddy 桌面端安装则由上述
+真实客户端截图单独证明。
+
 ## 6. 当前仍需外部条件完成的事项
 
-- **WorkBuddy 桌面端触发词的完整对话验收**：已能创建学习任务，但模型回答过程中的
-  具体工具调用 UI 证据仍待一次完整人工/客户端联调；这不影响上述 MCP 官方客户端证据。
 - **WorkBuddy 开放平台提交**：需平台账号与客户端审核入口，内部 zip 已就绪。
 - **运营占位信息替换**：`listing/support-contact.md` 中的支持/安全邮箱和示例域名需换成
   正式值后才能提交审核。

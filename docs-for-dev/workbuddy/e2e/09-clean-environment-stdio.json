@@ -1,0 +1,19 @@
+{
+  "scenario": "09-clean-environment-stdio",
+  "clean_venv": true,
+  "fresh_skill_directory": true,
+  "python": "3.13.18",
+  "deeptutor_version": "1.7.0",
+  "tool_count": 39,
+  "practice_summary": {
+    "total": 12,
+    "resolved": 7,
+    "unresolved": 5,
+    "bookmarked": 0,
+    "mistakes": 12,
+    "due": 0
+  },
+  "pip_check": "No broken requirements found.",
+  "skill_validation": "PASS: 15 text files, 0 errors, 0 warnings",
+  "dependency_fix": "SQLAlchemy[asyncio] installs greenlet required by async engine."
+}

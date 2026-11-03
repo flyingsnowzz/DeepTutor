@@ -1,0 +1,55 @@
+{
+  "scenario": "08-workbuddy-skill-host-generated-practice",
+  "transport": "stdio",
+  "client": "WorkBuddy 5.9.2",
+  "skill": "deeptutor-learning",
+  "evidence_type": "real_desktop_skill_conversation_and_postgres_verification",
+  "user_prompt": "/deeptutor-learning 出5道初三二次函数顶点坐标选择题，并加入我的练习库。",
+  "observed_flow": [
+    "capabilities_list",
+    "WorkBuddy 读取 references/mcp-tools.md 与 output-style.md",
+    "WorkBuddy 明确表示“下面由我生成 5 道题”",
+    "practice_entry_create（5 条）"
+  ],
+  "generation": {
+    "generated_by": "workbuddy_host",
+    "deeptutor_quiz_generate_job_called": false,
+    "evidence": "客户端过程显示由 WorkBuddy 生成，随后调用 practice_entry_create；未走 quiz_generate_submit。"
+  },
+  "result": {
+    "status": "completed",
+    "elapsed_seconds": 198,
+    "entries_created": 5,
+    "owner_user_id": "local-dev-user",
+    "owner_total_after": 12,
+    "source": "skill_managed"
+  },
+  "entries": [
+    {
+      "id": "practice_e6b9b05d91cb46739d5f42938390cb35",
+      "question": "抛物线 y = 2(x - 3)² + 1 的顶点坐标是？"
+    },
+    {
+      "id": "practice_d4288276919c467abd863a937d7801f2",
+      "question": "抛物线 y = x² - 4x + 3 的顶点坐标是？"
+    },
+    {
+      "id": "practice_2e263abc1292418b8583e5a64f33b147",
+      "question": "将抛物线 y = -x² + 2x + 3 配方后，其顶点坐标是？"
+    },
+    {
+      "id": "practice_4d62a47647f648eeb3742b5fef3fb742",
+      "question": "已知抛物线 y = ax² + bx + c（a = 1）的顶点为 (2, -1)，则 b 的值为？"
+    },
+    {
+      "id": "practice_148bface861f4f609488d9299bb6e89b",
+      "question": "抛物线 y = x² + bx + c 的顶点坐标为 (-1, -4)，则 b + c 的值为？"
+    }
+  ],
+  "screenshots": [
+    "docs-for-dev/workbuddy/host-generated-practice-tools.png",
+    "docs-for-dev/workbuddy/host-generated-practice-e2e.png",
+    "docs-for-dev/workbuddy/skill-installed.png",
+    "docs-for-dev/workbuddy/skill-trigger-e2e.png"
+  ]
+}

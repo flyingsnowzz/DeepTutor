@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build a WorkBuddy skill submission zip after validation.
 
-Bundles only the submission files (SKILL.md, references/, templates/,
+Bundles only the submission files (SKILL.md, README.md, references/, templates/,
 examples/, listing/) — no scripts, caches, or runtime data. The validator must
 pass before a zip is produced; `--force` skips validation for local iteration
 only and prints a warning.
@@ -50,6 +50,8 @@ def build_zip(package_dir: Path, out_dir: Path, *, force: bool = False) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     dest = out_dir / f"{name}-{version}.zip"
     files = [package_dir / "SKILL.md"]
+    if (package_dir / "README.md").is_file():
+        files.append(package_dir / "README.md")
     for directory in sorted(INCLUDE_DIRS):
         root = package_dir / directory
         if not root.is_dir():

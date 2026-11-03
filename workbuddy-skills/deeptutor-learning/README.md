@@ -20,9 +20,10 @@ listing/      图标、展示图、隐私政策、用户协议、未成年人说
 - 本地试用可用确定性运行器（`DEEPTUTOR_MCP_DETERMINISTIC=1`），无需模型密钥。
 
 ### 方式 A：本地 stdio（开发自测）
-1. 启动服务：`deeptutor mcp serve --transport stdio`
-2. 在 WorkBuddy 的 MCP 配置中加入 `examples/../mcp-config/mcp-stdio.example.json` 对应条目（见仓库 `mcp-config/`）。
-3. 连接指示灯正常后，安装本技能包；输入“出 5 道二次函数选择题”验证触发。
+1. 启动服务：`deeptutor mcp serve --transport stdio`。源码运行时，`DEEPTUTOR_HOME` 必须指向项目根目录。
+2. 按仓库 `workbuddy-skills/mcp-config/mcp-stdio.example.json` 把 `deeptutor` 条目合并进 `~/.workbuddy/mcp.json`，并把命令、数据库和对象存储配置替换为当前环境值。
+3. 把本目录完整复制为 `~/.workbuddy/skills/deeptutor-learning`，在 WorkBuddy“专家·技能·连接器 → 技能 → 已安装”中确认已启用。
+4. 重启或刷新 WorkBuddy，确认 MCP 连接指示灯和工具数量正常；输入 `/deeptutor-learning 出5道二次函数选择题，并加入我的练习库` 验证 Skill 触发与写库。
 
 ### 方式 B：云端 streamable HTTP（多账户）
 1. 服务端启动：
@@ -30,6 +31,7 @@ listing/      图标、展示图、隐私政策、用户协议、未成年人说
 2. 在浏览器打开托管登录页注册/登录，获取 access token（不要把密码或令牌发给对话）。
 3. 配置 `mcp-config/mcp-http.example.json`：`url=https://<host>/mcp`，`Authorization: Bearer <access_token>`。
 4. 未登录或令牌失效时，服务返回 401 与登录入口，按引导授权即可。
+5. 技能安装方式同方式 A；用 `/deeptutor-learning 今天复习什么？` 验证 Skill 与远程工具。
 
 ### 验收
 - `capabilities_list` 返回能力列表；

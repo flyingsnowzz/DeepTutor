@@ -1,0 +1,27 @@
+{
+  "scenario": "07-workbuddy-desktop-review",
+  "transport": "stdio",
+  "client": "WorkBuddy 5.9.2",
+  "evidence_type": "real_desktop_conversation",
+  "user_prompt": "请使用 DeepTutor 学习助手，调用 deeptutor MCP 的 practice_summary_get 和 review_tasks_list，告诉我今天复习什么。不要自己编造学习记录。",
+  "observed_tools": [
+    "practice_summary_get",
+    "review_tasks_list"
+  ],
+  "result": {
+    "status": "completed",
+    "elapsed_seconds": 31,
+    "total": 7,
+    "resolved": 7,
+    "unresolved": 0,
+    "bookmarked": 0,
+    "mistakes": 7,
+    "due": 0,
+    "review_count": 0
+  },
+  "screenshots": [
+    "docs-for-dev/workbuddy/workbuddy-review-e2e-full.png",
+    "docs-for-dev/workbuddy/workbuddy-review-e2e.png"
+  ],
+  "note": "WorkBuddy 桌面端真实对话；最终回复明确列出两个工具名和真实统计，不是脚本模拟。"
+}

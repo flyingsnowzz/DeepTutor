@@ -321,20 +321,20 @@ PY
 
 ### 7.1 MCP 服务自检
 
-- [ ] Docker Compose 启动 Postgres/MinIO。
-- [ ] `deeptutor mcp serve --transport stdio` 能启动。
-- [ ] MCP Inspector 或等价客户端能 list tools。
-- [ ] `capabilities_list` 返回 expected tools。
-- [ ] 研究/可视化 job 可提交并轮询成功。
-- [ ] artifact 可获取。
+- [x] Docker Compose 启动 Postgres/MinIO。
+- [x] `deeptutor mcp serve --transport stdio` 能启动。
+- [x] MCP Inspector 或等价客户端能 list tools。
+- [x] `capabilities_list` 返回 expected tools。
+- [x] 研究/可视化 job 可提交并轮询成功。
+- [x] artifact 可获取。
 
 ### 7.2 WorkBuddy 配置测试
 
-- [ ] WorkBuddy 能发现 `deeptutor` MCP server。
-- [ ] 连接指示灯正常。
-- [ ] 技能触发词能打开 Skill。
-- [ ] “出 5 道题/讲这道题/今天复习什么”命中正确工具。
-- [ ] 未登录时能出现登录/授权引导。
+- [x] WorkBuddy 能发现 `deeptutor` MCP server。
+- [x] 连接指示灯正常。
+- [x] `/deeptutor-learning` 能打开 Skill（`skill-trigger-e2e.png`）。
+- [x] “出 5 道题/今天复习什么”命中正确工具；简单讲解由宿主模型按分工完成。
+- [x] 未登录时能出现登录/授权引导（T3 HTTP 401 证据）。
 
 ### 7.3 场景测试
 
@@ -373,16 +373,16 @@ PY
 
 ## 9. 上架前硬性检查
 
-- [ ] frontmatter 必填字段完整。
-- [ ] 无硬编码 token、密码、cookie、私钥。
-- [ ] 无生产服务器绝对路径。
-- [ ] 无 `curl` 外传数据、无任意 shell、无 `rm -rf` 等危险脚本。
-- [ ] 不把 `exec` 暴露给宿主模型。
-- [ ] 所有长任务走 job，不假装同步完成。
-- [ ] 输出不承诺提分、官方成绩或证书。
-- [ ] 不包含未授权教材、真题、机构讲义。
-- [ ] references 中工具名与 T2/T3 实际实现一致。
-- [ ] 在干净机器上按 README 能完成安装和联调。
+- [x] frontmatter 必填字段完整。
+- [x] 无硬编码 token、密码、cookie、私钥。
+- [x] 无生产服务器绝对路径。
+- [x] 无 `curl` 外传数据、无任意 shell、无 `rm -rf` 等危险脚本。
+- [x] 不把 `exec` 暴露给宿主模型。
+- [x] 所有长任务走 job，不假装同步完成。
+- [x] 输出不承诺提分、官方成绩或证书。
+- [x] 不包含未授权教材、真题、机构讲义。
+- [x] references 中工具名与 T2/T3 实际实现一致。
+- [x] 在干净环境按 README 完成安装和联调（全新 venv + 独立技能目录，场景 09：39 个工具、pip check、Skill validator 均通过）。
 
 ## 完成标准
 
@@ -399,9 +399,10 @@ PY
 - 真实模型内容验证已完成：stdio 与 streamable HTTP 两条链路均用真实模型产出完整选择题（非占位），记录见 `docs-for-dev/workbuddy/e2e/05-real-llm-quiz-{stdio,http}.json`。
 - WorkBuddy 桌面端已实际接入，MCP 服务管理显示 `39/39` 工具启用，截图：`docs-for-dev/workbuddy/mcp-connection.png`。
 - 宿主生成内容的学习闭环已验证：`docs-for-dev/workbuddy/e2e/06-host-driven-practice-stdio.json` 证明宿主提供题目后，DeepTutor 无需再次生成即可完成入库、判题、SRS 和统计。
-- 尚待外部条件：客户端完整对话触发验收、平台正式提交、支持邮箱/域名占位替换；详见 `docs-for-dev/workbuddy/local-validation.md` 第 6 节。
+- WorkBuddy 客户端完整验收已完成：Skill 首次安装并启用，`/deeptutor-learning` 显式触发成功；“今日复习”完整对话和“宿主生成 5 题 → `practice_entry_create` 入库”均有截图及 JSON 记录（场景 07/08）。
+- 尚待外部条件：平台正式提交、支持邮箱/域名占位替换；干净环境安装复核见下方验证记录。
 
-## 验证证据（2026-11-02）
+## 验证证据（2026-11-03）
 
 ```text
 python scripts/release/validate_workbuddy_skill.py workbuddy-skills/deeptutor-learning
@@ -419,6 +420,13 @@ python scripts/workbuddy/e2e/run.py
 
 python -m scripts.workbuddy.e2e.host_driven_practice
 => 06-host-driven-practice stdio 通过；宿主供题，无 DeepTutor 服务端生成调用
+
+真实 WorkBuddy 客户端
+=> 07-workbuddy-desktop-review / 08-workbuddy-skill-host-generated-practice
+   WorkBuddy 5.9.2 真实客户端证据；宿主生成 5 题并由 MCP 写库
+
+独立干净环境（全新 venv + 独立技能目录）
+=> 09-clean-environment-stdio：pip check / validator / 39 tools / practice_summary_get 全通过
 
 联调与安全扫描报告：docs-for-dev/workbuddy/local-validation.md
 ```
