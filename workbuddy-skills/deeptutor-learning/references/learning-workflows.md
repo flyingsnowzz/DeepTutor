@@ -3,12 +3,12 @@
 ## 1. K12 作业答疑（解题 + 同类练习）
 
 1. 澄清：学段/学科；题目不完整时索要题干、图片或选项。
-2. `problem_solve_submit`（input.prompt 含完整题目；带 idempotency_key）。
-3. 轮询 `problem_solve_get`；把分步解答讲清楚，先思路后计算。
-4. 需要巩固时 `quiz_generate_submit` 出 2 道同类题；完成后引导提交答案：
-   - 若题目已在练习库：`practice_answer_check(entry_id, answer, request_id)`；
-   - 讲解中强调方法与易错点，不直接替学生完成要上交的作业（可讲思路、让学生自己算）。
-5. 话术示例见 `examples/solve-problem.md`。
+2. **优先由宿主模型完成讲解与简单同类题生成**，避免让 DeepTutor 重复生成相同内容。
+   需要 DeepTutor 的复杂分步解题管线时，才 `problem_solve_submit` 并轮询 `problem_solve_get`。
+3. 需要巩固时，宿主模型直接产出 2 道同类题，然后用 `practice_entry_create` 把题干、选项、正确答案、解析写入练习库；只有需要学习状态驱动/复杂校验的诊断题才走 `quiz_generate_submit`。
+4. 学生提交答案后：`practice_answer_check(entry_id, answer, request_id)`。
+5. 讲解中强调方法与易错点，不直接替学生完成要上交的作业（可讲思路、让学生自己算）。
+6. 话术示例见 `examples/solve-problem.md`。
 
 ## 2. 大学课程自学（资料精读 + 复习题）
 
@@ -21,7 +21,7 @@
 
 ## 3. 练习闭环（答题 → 错因 → 掌握度变化）
 
-1. 题目来源：出题作业写入、或 `practice_entry_create`（宿主/用户自有题）。
+1. 题目来源：优先由宿主模型生成并通过 `practice_entry_create` 入库；也可来自 DeepTutor 出题作业或用户自有题。
 2. `practice_question_get` 展示题面 → 学生作答 → `practice_answer_check`（**每次新动作新 request_id**）。
 3. 答错：
    - 工具返回 `review`（SM-2 调度与 due_at）与正确答案；讲错因、给一个最小例子；

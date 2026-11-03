@@ -12,8 +12,8 @@
 | 登录/401 流程 | 未认证 /mcp 返回 401 + 登录/注册 URL（T3 已验证） |
 
 连接指示灯：stdio 与 streamable HTTP 两种 MCP 配置（`workbuddy-skills/mcp-config/`）
-在官方 MCP 客户端下均成功 `initialize` 与 `list_tools`（等价于宿主连接指示灯正常；
-WorkBuddy 桌面端截图待客户端接入后补拍）。
+在官方 MCP 客户端下均成功 `initialize` 与 `list_tools`；WorkBuddy 桌面端实际接入与
+`39/39` 工具启用截图见第 5 节。
 
 ## 2. 四条 E2E 场景（stdio + HTTP 各跑一遍）
 
@@ -37,10 +37,10 @@ python scripts/workbuddy/e2e/run.py
 
 ```text
 python scripts/release/validate_workbuddy_skill.py workbuddy-skills/deeptutor-learning
-=> PASS（14 个文本文件，0 errors）
+=> PASS（15 个文本文件，0 errors）
 
 python scripts/release/build_workbuddy_skill_zip.py workbuddy-skills/deeptutor-learning dist/workbuddy-skills
-=> dist/workbuddy-skills/deeptutor-learning-0.1.0.zip（validated: true，14 个文件）
+=> dist/workbuddy-skills/deeptutor-learning-0.1.0.zip（validated: true，24 个文件）
 
 python -m pytest tests/workbuddy_skills -q
 => 8 passed（frontmatter、结构、敏感信息、工具名一致性、无脚本、zip 构建、负例）
@@ -59,7 +59,22 @@ python -m pytest tests/workbuddy_skills -q
 - 隐私政策、用户协议、未成年人保护、服务依赖、授权解绑、支持邮箱（占位待运营替换）
 - 内部审核队列：待 WorkBuddy 开放平台账号与客户端接入后提交；提交前需把占位邮箱与域名替换为正式值。
 
-## 5. 2026-11-03 补充：真实模型与桌面端接入
+## 5. 2026-11-03 补充：模型分工、真实模型与桌面端接入
+
+### 模型调用分工
+
+- **WorkBuddy 宿主模型**：意图理解、对话组织、简单讲解、普通题目与媒体初稿等简单内容生成。
+- **DeepTutor**：复杂多阶段 Agent 管线（研究、复杂出题/解题、精读）、资料处理、判题、练习/掌握度/SRS 状态和教学产物。
+- 宿主已经生成的内容不再交给 DeepTutor 重复生成。普通题目通过 `practice_entry_create` 入库，再调用 `practice_answer_check` / `practice_review_submit` 完成学习闭环。
+- 需要 DeepTutor 复杂能力时，直接消费其结果，不让宿主再生成一份替代答案。
+
+场景 06 验证了上述边界（运行 `python -m scripts.workbuddy.e2e.host_driven_practice`）：
+
+| 场景 | 证据 | 结果 |
+| --- | --- | --- |
+| 宿主出题 → DeepTutor 判题与复习 | `e2e/06-host-driven-practice-stdio.json` | 宿主提供完整选择题；DeepTutor 仅做入库、错答识别、SRS 和统计，无服务端生成调用 |
+
+> 场景 06 是 MCP 协议级确定性验证，题目由测试脚本模拟宿主提供；它不是 WorkBuddy 桌面端真实模型调用的截图证据，也不代表 DeepTutor 真实生成能力。后者由场景 05 单独验证。
 
 ### WorkBuddy 客户端实际接入
 

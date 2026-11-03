@@ -54,7 +54,7 @@
 
 | 工具 | 入参 | 说明 |
 | --- | --- | --- |
-| `practice_entry_create` | `question / correct_answer / question_type? / options? / explanation? / knowledge_point_id? / mastery_path_id? / difficulty?` | 宿主自有题源入题库，返回 `entry_id` |
+| `practice_entry_create` | `question / correct_answer / question_type? / options? / explanation? / knowledge_point_id? / mastery_path_id? / difficulty?` | 宿主自有题源或宿主模型生成题目入题库，返回 `entry_id`。优先用它承接 WorkBuddy 生成的内容，避免双端重复调模型 |
 | `practice_question_get` | `entry_id` | 取题面（不含判分过程） |
 | `practice_answer_check` | `entry_id / answer / request_id` | 确定性判分；答错自动建 SRS 错题行；挂掌握路径时写掌握证据事件 |
 | `practice_review_submit` | `entry_id / rating(again|hard|good|easy) / request_id` | SM-2-lite 调度，返回下次 `due_at` |

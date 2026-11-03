@@ -35,6 +35,13 @@
 
 **不要把复杂业务逻辑写进 Skill 脚本。** Skill 是声明式门面，不保存学习状态、不保存密钥、不直接访问服务器数据库。
 
+### 模型调用边界
+
+- WorkBuddy 负责意图理解、对话组织、简单讲解和普通题目生成；
+- DeepTutor 负责复杂 Agent 管线、资料精读、判题、练习/掌握度/SRS 状态和教学产物；
+- 普通题目由宿主生成后通过 `practice_entry_create` 入库，不再调用 `quiz_generate_submit` 重复生成；
+- 只有学习状态驱动、复杂校验或多阶段生成任务才调用 DeepTutor 模型管线。
+
 ## 1. 技能包规划
 
 首发建议一个主技能，后续再拆细分技能。
@@ -391,6 +398,7 @@ PY
 
 - 真实模型内容验证已完成：stdio 与 streamable HTTP 两条链路均用真实模型产出完整选择题（非占位），记录见 `docs-for-dev/workbuddy/e2e/05-real-llm-quiz-{stdio,http}.json`。
 - WorkBuddy 桌面端已实际接入，MCP 服务管理显示 `39/39` 工具启用，截图：`docs-for-dev/workbuddy/mcp-connection.png`。
+- 宿主生成内容的学习闭环已验证：`docs-for-dev/workbuddy/e2e/06-host-driven-practice-stdio.json` 证明宿主提供题目后，DeepTutor 无需再次生成即可完成入库、判题、SRS 和统计。
 - 尚待外部条件：客户端完整对话触发验收、平台正式提交、支持邮箱/域名占位替换；详见 `docs-for-dev/workbuddy/local-validation.md` 第 6 节。
 
 ## 验证证据（2026-11-02）
@@ -408,6 +416,9 @@ python -m pytest tests/workbuddy_skills -q
 python scripts/workbuddy/e2e/run.py
 => 01-k12-math / 02-reading-session / 03-practice-loop / 04-media-generation
    stdio + http 全部通过（记录：docs-for-dev/workbuddy/e2e/*.json）
+
+python -m scripts.workbuddy.e2e.host_driven_practice
+=> 06-host-driven-practice stdio 通过；宿主供题，无 DeepTutor 服务端生成调用
 
 联调与安全扫描报告：docs-for-dev/workbuddy/local-validation.md
 ```
@@ -428,6 +439,7 @@ python scripts/workbuddy/e2e/run.py
 python scripts/release/validate_workbuddy_skill.py workbuddy-skills/deeptutor-learning
 python scripts/release/build_workbuddy_skill_zip.py workbuddy-skills/deeptutor-learning dist/workbuddy-skills
 python -m pytest tests/workbuddy_skills -q
+python -m scripts.workbuddy.e2e.host_driven_practice
 ```
 
 必须保留 WorkBuddy 连接指示灯截图、工具调用日志、四条 E2E 记录、安全扫描报告和待提交 zip 路径。

@@ -37,8 +37,8 @@ examples_en:
 
 | 用户意图 | 调用方式 |
 | --- | --- |
-| 分步解题、讲懂题目、同类练习 | 作业：`problem_solve_submit` → 轮询 `problem_solve_get` |
-| 出练习题/诊断题 | 作业：`quiz_generate_submit` → `quiz_generate_job_get` |
+| 分步解题、讲懂题目、同类练习 | 简单题先由宿主模型讲解；需要复杂 Agent 分步管线时用 `problem_solve_submit` → `problem_solve_get` |
+| 出练习题/诊断题 | 简单出题由宿主模型生成后 `practice_entry_create` 入库；需要学习状态驱动/复杂校验的诊断题才用 `quiz_generate_submit` → `quiz_generate_job_get` |
 | 主观题/图片题判分 | 作业：`quiz_judge_submit/get`（仅形成性反馈，不是官方分数） |
 | 资料精读、逐段提问、复习题 | 实时会话：`reading_material_register` → `reading_session_start` → 多轮 `reading_session_reply` |
 | 提交客观题答案/记录错题 | `practice_entry_create` → `practice_answer_check`（带 request_id） |
@@ -52,6 +52,8 @@ examples_en:
 | 取产物（图、音频、视频、文稿） | `artifact_get`，链接短期有效（约 15 分钟） |
 
 详细入参/出参见 `references/mcp-tools.md`，长任务规则见 `references/job-flow.md`，四类典型流程见 `references/learning-workflows.md`。
+
+**避免双端重复调模型**：能由宿主一次生成并结构化的内容（普通题目、简单讲解、媒体初稿），不要再到 DeepTutor 重复生成；把结构化结果写入 `practice_entry_create` 或相应作业即可。只有需要 DeepTutor 的多阶段 Agent 能力时，才走其模型管线。
 
 ## 回答规范
 

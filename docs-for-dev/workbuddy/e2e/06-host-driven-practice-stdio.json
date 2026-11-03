@@ -1,0 +1,34 @@
+{
+  "scenario": "06-host-driven-practice",
+  "transport": "stdio",
+  "model_call_by": "workbuddy_host",
+  "server_model_call": false,
+  "user_prompt": "WorkBuddy 生成二次函数顶点坐标选择题后，学生作答并安排复习",
+  "host_generated_question": {
+    "question": "二次函数 y=x²-4x+3 的顶点坐标是？",
+    "question_type": "single_choice",
+    "options": {
+      "A": "(2,1)",
+      "B": "(2,-1)",
+      "C": "(-2,1)",
+      "D": "(-2,-1)"
+    },
+    "correct_answer": "B",
+    "explanation": "y=(x-2)²-1，所以顶点为 (2,-1)。",
+    "knowledge_point_id": "kp-quadratic-vertex"
+  },
+  "tool_flow": [
+    "practice_entry_create",
+    "practice_answer_check",
+    "practice_review_submit",
+    "practice_summary_get"
+  ],
+  "result": {
+    "entry_created": true,
+    "wrong_answer_detected": true,
+    "review_rating": "good",
+    "summary_total": 7
+  },
+  "elapsed_seconds": 0.703,
+  "evidence_note": "题目由宿主（WorkBuddy）提供，DeepTutor 只负责判题、复习调度与统计，不需要服务端再调模型生成。"
+}
