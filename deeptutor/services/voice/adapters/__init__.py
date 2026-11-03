@@ -14,6 +14,7 @@ from deeptutor.services.voice.adapters.dashscope import (
 )
 from deeptutor.services.voice.adapters.edge import EdgeTTSAdapter
 from deeptutor.services.voice.adapters.gemini import GeminiTTSAdapter
+from deeptutor.services.voice.adapters.macos_say import MacOSSayTTSAdapter
 from deeptutor.services.voice.adapters.mimo import MiMoTTSAdapter
 from deeptutor.services.voice.adapters.minimax import MiniMaxTTSAdapter
 from deeptutor.services.voice.adapters.openai_compat import (
@@ -33,6 +34,7 @@ TTS_ADAPTERS: dict[str, BaseTTSAdapter] = {
     "dashscope": DashScopeTTSAdapter(),
     "gemini": GeminiTTSAdapter(),
     "edge": EdgeTTSAdapter(),
+    "macos_say": MacOSSayTTSAdapter(),
 }
 
 STT_ADAPTERS: dict[str, BaseSTTAdapter] = {

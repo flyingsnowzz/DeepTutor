@@ -46,7 +46,7 @@ CASES = {
     "audio_overview": {
         "prompt": "生成约 30 秒的立方体体积音频导学，解释 V=a³，并给出棱长 3 时体积 27 的例子。",
         "knowledge_bases": ["capability-audit-cube-v2"],
-        "config": {"target_minutes": 1, "host_voice": "zh-CN-XiaoxiaoNeural", "expert_voice": "zh-CN-YunxiNeural"},
+        "config": {"target_minutes": 1, "host_voice": "Tingting", "expert_voice": "Reed"},
         "timeout": 600,
     },
     "mastery_path": {
@@ -54,11 +54,11 @@ CASES = {
         "timeout": 600,
     },
     "video_lesson": {
-        "prompt": "生成约 20 秒的立方体体积视频课，解释 V=a³ 和棱长 3 体积 27。",
+        "prompt": "生成约 8 秒、只有 2 个简洁场景的立方体体积视频课，展示 V=a³ 和 3³=27。",
         "timeout": 900,
     },
     "math_animator": {
-        "prompt": "生成约 10 秒数学动画，展示棱长为 a 的立方体由 a×a×a 个单位小立方体组成。",
+        "prompt": "生成约 5 秒、只有一个简洁场景的数学动画，显示 V=a³ 和 3³=27，不要复杂几何体。",
         "timeout": 900,
     },
 }

@@ -138,6 +138,7 @@ WorkBuddy 重启后已确认实际进程为 `DEEPTUTOR_MCP_DETERMINISTIC=0`。�
 visualize 请求由 DeepTutor 返回正确 Mermaid，并在客户端展示，证据：
 [`capability-audit/workbuddy-visualize-real.png`](./capability-audit/workbuddy-visualize-real.png)。
 较复杂请求曾发生模型停滞，因此同时增加服务端能力超时和结果有效性校验。
+音频已增加离线 macOS `say` TTS，并完成真实 MP3 与逐字稿的产物下载验证；其他部署环境仍需配置可用 TTS。
 真实 `quiz_generate_submit` 也已在 WorkBuddy 中返回完整选择题和解析，证据：
 [`capability-audit/workbuddy-quiz-real.png`](./capability-audit/workbuddy-quiz-real.png)。
 

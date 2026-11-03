@@ -1,7 +1,196 @@
 {
   "capability": "audio_overview",
-  "job_id": "job_0f414151028443eeb83307e75cb4c59e",
-  "status": "failed",
-  "error": "{\"code\": \"JOB_FAILED\", \"message\": \"Capability run failed\", \"retryable\": false}",
-  "input": "{\"prompt\": \"生成约 30 秒的立方体体积音频导学，解释 V=a³，并给出棱长 3 时体积 27 的例子。\", \"knowledge_bases\": [\"capability-audit-cube-v2\"], \"config\": {\"target_minutes\": 1, \"host_voice\": \"zh-CN-XiaoxiaoNeural\", \"expert_voice\": \"zh-CN-YunxiNeural\"}}"
+  "status": "succeeded",
+  "elapsed_seconds": 48.658,
+  "placeholder_detected": false,
+  "submit": {
+    "ok": true,
+    "data": {
+      "job_id": "job_defee9548d9c49fb9f332003986d31e7",
+      "session_id": "sess_40adb0ba8f5748ad8b254fb41ee3e4cb",
+      "status": "running",
+      "poll_after_ms": 1000,
+      "billing": {
+        "meter": "media",
+        "charged_on": "job_succeeded",
+        "idempotency": "same idempotency_key never charges twice"
+      }
+    },
+    "error": null
+  },
+  "final": {
+    "ok": true,
+    "data": {
+      "job_id": "job_defee9548d9c49fb9f332003986d31e7",
+      "session_id": "sess_40adb0ba8f5748ad8b254fb41ee3e4cb",
+      "status": "succeeded",
+      "source_channel": "first_party",
+      "progress": null,
+      "result": {
+        "response": "# 立方体体积：V 等于 a 的三次方\n\n## Sources\n\n- [S1] cube.md\n\n## Transcript\n\n### 主持人\n\n用一分钟搞懂立方体体积。核心问题：为什么体积可以写成边长的三次方？\n\n### 专家\n\n因为立方体的长宽高都等于同一条棱长，我们用 a 表示。体积按长乘宽乘高计算，所以是 a 乘 a 再乘 a，也就是 a 的三次方。 [S1]\n\n### 主持人\n\n公式记住了，但能不能从“装小方块”的角度理解它？\n\n### 专家\n\n可以。把立方体想成由很多个同样大小的单位小立方体堆起来：每一层有 a 乘 a 个，一共 a 层，所以总数是 a 乘 a 乘 a。 [S1]\n\n### 主持人\n\n这个说法听起来简单。那常见误解是什么？\n\n### 专家\n\n常见误解是把体积当成边长乘 3，或用面积公式去算；这里量的是三维空间里装了多少个单位小立方体。 [S1]\n\n### 主持人\n\n给一个最直白的例子，最好边长是整数。\n\n### 专家\n\n取棱长为 3 的立方体：每层 3 乘 3 等于 9 个单位小立方体，一共 3 层，所以是 9 乘 3 等于 27 个立方单位。 [S1]\n\n### 主持人\n\n最后帮大家收束成一句能背的要点。\n\n### 专家\n\n要点就是 V 等于 a 的三次方；已知边长时，按三次连乘计算，并写成立方单位。 [S1]\n",
+        "title": "立方体体积：V 等于 a 的三次方",
+        "kb_name": "capability-audit-cube-v2",
+        "selected_kbs": [
+          "capability-audit-cube-v2"
+        ],
+        "citations": [
+          {
+            "source_id": "S1",
+            "title": "cube.md",
+            "locator": ""
+          }
+        ],
+        "segments": [
+          {
+            "speaker": "host",
+            "text": "用一分钟搞懂立方体体积。核心问题：为什么体积可以写成边长的三次方？",
+            "source_ids": []
+          },
+          {
+            "speaker": "expert",
+            "text": "因为立方体的长宽高都等于同一条棱长，我们用 a 表示。体积按长乘宽乘高计算，所以是 a 乘 a 再乘 a，也就是 a 的三次方。",
+            "source_ids": [
+              "S1"
+            ]
+          },
+          {
+            "speaker": "host",
+            "text": "公式记住了，但能不能从“装小方块”的角度理解它？",
+            "source_ids": []
+          },
+          {
+            "speaker": "expert",
+            "text": "可以。把立方体想成由很多个同样大小的单位小立方体堆起来：每一层有 a 乘 a 个，一共 a 层，所以总数是 a 乘 a 乘 a。",
+            "source_ids": [
+              "S1"
+            ]
+          },
+          {
+            "speaker": "host",
+            "text": "这个说法听起来简单。那常见误解是什么？",
+            "source_ids": []
+          },
+          {
+            "speaker": "expert",
+            "text": "常见误解是把体积当成边长乘 3，或用面积公式去算；这里量的是三维空间里装了多少个单位小立方体。",
+            "source_ids": [
+              "S1"
+            ]
+          },
+          {
+            "speaker": "host",
+            "text": "给一个最直白的例子，最好边长是整数。",
+            "source_ids": []
+          },
+          {
+            "speaker": "expert",
+            "text": "取棱长为 3 的立方体：每层 3 乘 3 等于 9 个单位小立方体，一共 3 层，所以是 9 乘 3 等于 27 个立方单位。",
+            "source_ids": [
+              "S1"
+            ]
+          },
+          {
+            "speaker": "host",
+            "text": "最后帮大家收束成一句能背的要点。",
+            "source_ids": []
+          },
+          {
+            "speaker": "expert",
+            "text": "要点就是 V 等于 a 的三次方；已知边长时，按三次连乘计算，并写成立方单位。",
+            "source_ids": [
+              "S1"
+            ]
+          }
+        ],
+        "audio_path": "turn_1793679490430_9db847edab-audio-overview.mp3",
+        "transcript_path": "turn_1793679490430_9db847edab-audio-overview.md",
+        "workspace_items": [
+          {
+            "workspace_id": "ws_270fa4f1ffff5cfd938eb090972a208c",
+            "workspace_item_id": "wsi_38c53fded60452d9941fdef57cc0ba5c",
+            "relative_path": "outputs/audio_overview/unified_1793679490424_92e928bd/turn_1793679490430_9db847edab/turn_1793679490430_9db847edab-audio-overview.mp3",
+            "filename": "turn_1793679490430_9db847edab-audio-overview.mp3",
+            "mime_type": "audio/mpeg",
+            "size_bytes": 204524,
+            "sha256": "b5c967f26218e9ad35501ce92c3ddd5ea1fd3c5e0ee928ed7ebecfe4eac523d6",
+            "url": "/files/workspace-items/ws_270fa4f1ffff5cfd938eb090972a208c/wsi_38c53fded60452d9941fdef57cc0ba5c?dt_workspace=",
+            "title": "立方体体积：V 等于 a 的三次方",
+            "caption": "Audio overview",
+            "generated": true,
+            "data_workspace_id": ""
+          },
+          {
+            "workspace_id": "ws_270fa4f1ffff5cfd938eb090972a208c",
+            "workspace_item_id": "wsi_94b3b533d5b05b468d78f2c03576138f",
+            "relative_path": "outputs/audio_overview/unified_1793679490424_92e928bd/turn_1793679490430_9db847edab/turn_1793679490430_9db847edab-audio-overview.md",
+            "filename": "turn_1793679490430_9db847edab-audio-overview.md",
+            "mime_type": "text/markdown",
+            "size_bytes": 1300,
+            "sha256": "cc205e479da780985d8ed0a00b2048b16959b97bf11ca06ae3be43d09ef1032d",
+            "url": "/files/workspace-items/ws_270fa4f1ffff5cfd938eb090972a208c/wsi_94b3b533d5b05b468d78f2c03576138f?dt_workspace=",
+            "title": "立方体体积：V 等于 a 的三次方",
+            "caption": "Audio overview transcript",
+            "generated": true,
+            "data_workspace_id": ""
+          }
+        ],
+        "metadata": {
+          "usage_summary": {
+            "prompt_tokens": 617,
+            "completion_tokens": 660,
+            "total_tokens": 1277,
+            "cache_read_input_tokens": 576,
+            "cache_creation_input_tokens": 0,
+            "reasoning_tokens": 0,
+            "duration_seconds": 38.482610291997844,
+            "total_calls": 1,
+            "cache_reported_calls": 1,
+            "cache_input_tokens": 617,
+            "cache_hit_rate": 0.93354943273906,
+            "ttft_seconds": null,
+            "ttft_calls": 0,
+            "generation_seconds": 0,
+            "timed_completion_tokens": 0,
+            "tokens_per_second": null,
+            "estimated_calls": 0,
+            "call_details": [
+              {
+                "call_id": "900e2e8c9805416f90b605fe1084729f",
+                "prompt_tokens": 617,
+                "completion_tokens": 660,
+                "total_tokens": 1277,
+                "cache_read_input_tokens": 576,
+                "model": "spark-x2.6",
+                "provider": "OpenAICompatProvider",
+                "status": "completed",
+                "estimated": false,
+                "duration_seconds": 38.482610291997844,
+                "ttft_seconds": null,
+                "generation_seconds": null,
+                "tokens_per_second": null,
+                "cache_hit_rate": 0.93354943273906
+              }
+            ]
+          }
+        }
+      },
+      "artifacts": [
+        {
+          "artifact_ref": "art_e736fc29d59f47f897c648dd4c415f19",
+          "kind": "audio_overview",
+          "mime_type": "audio/mpeg",
+          "title": "turn_1793679490430_9db847edab-audio-overview.mp3"
+        },
+        {
+          "artifact_ref": "art_4337948be6d240a19cc0911665135667",
+          "kind": "workspace_artifact",
+          "mime_type": "text/markdown",
+          "title": "turn_1793679490430_9db847edab-audio-overview.md"
+        }
+      ],
+      "needs_input": null,
+      "error": null
+    },
+    "error": null
+  }
 }

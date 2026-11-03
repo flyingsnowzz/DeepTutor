@@ -248,6 +248,11 @@ class TurnCapabilityRunner:
             return
 
         if capability == "audio_overview":
+            workspace_items = list(result.get("workspace_items") or [])
+            if workspace_items:
+                for item in workspace_items:
+                    yield from self._workspace_item_artifact(item)
+                return
             root = self._workspace_output_dir(capability, session, turn)
             for key, kind, mime in (
                 ("audio_path", "audio_overview", "audio/mpeg"),
@@ -271,6 +276,11 @@ class TurnCapabilityRunner:
             return
 
         if capability == "math_animator":
+            workspace_items = list(result.get("workspace_items") or [])
+            if workspace_items:
+                for item in workspace_items:
+                    yield from self._workspace_item_artifact(item)
+                return
             root = self._workspace_output_dir(capability, session, turn) / "artifacts"
             for item in result.get("artifacts") or []:
                 yield from self._file_artifact(
@@ -278,6 +288,24 @@ class TurnCapabilityRunner:
                     "math_animator",
                     item.get("content_type") or "application/octet-stream",
                 )
+
+    @staticmethod
+    def _workspace_item_artifact(item: dict[str, Any]):
+        from deeptutor.services.workspace import get_content_workspace_service
+
+        relative_path = str(item.get("relative_path") or "")
+        workspace_id = str(item.get("workspace_id") or "")
+        if not relative_path or not workspace_id:
+            return
+        service = get_content_workspace_service()
+        binding = service.binding_by_id(workspace_id)
+        path = binding.root / Path(*relative_path.split("/"))
+        kind = "audio_overview" if str(item.get("mime_type", "")).startswith("audio/") else "workspace_artifact"
+        yield from TurnCapabilityRunner._file_artifact(
+            path,
+            kind,
+            item.get("mime_type") or "application/octet-stream",
+        )
 
     @staticmethod
     def _workspace_output_dir(capability: str, session: dict, turn: dict) -> Path:

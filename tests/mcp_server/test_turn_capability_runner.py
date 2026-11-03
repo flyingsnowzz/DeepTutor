@@ -184,3 +184,51 @@ async def test_math_artifacts_are_collected_from_turn_workspace(monkeypatch, tmp
 
     assert outcome.artifacts[0]["data"] == b"real-video"
     assert outcome.artifacts[0]["mime_type"] == "video/mp4"
+
+
+@pytest.mark.asyncio
+async def test_workspace_item_uses_original_turn_workspace(monkeypatch, tmp_path):
+    relative = "outputs/audio_overview/session/turn/speech.mp3"
+    target = tmp_path / relative
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"real-audio")
+    app = FakeApp(
+        [
+            [
+                result_event(
+                    {
+                        "response": "transcript",
+                        "workspace_items": [
+                            {
+                                "workspace_id": "ws-original",
+                                "relative_path": relative,
+                                "filename": "speech.mp3",
+                                "mime_type": "audio/mpeg",
+                            }
+                        ],
+                    }
+                ),
+                done_event(),
+            ]
+        ]
+    )
+    monkeypatch.setattr("deeptutor.app.DeepTutorApp", lambda: app)
+
+    class Binding:
+        root = tmp_path
+
+    class Service:
+        def binding_by_id(self, workspace_id):
+            assert workspace_id == "ws-original"
+            return Binding()
+
+    monkeypatch.setattr(
+        "deeptutor.services.workspace.get_content_workspace_service", lambda: Service()
+    )
+
+    outcome = await TurnCapabilityRunner().run(
+        capability="audio_overview", payload={"prompt": "audio"}
+    )
+
+    assert outcome.artifacts[0]["data"] == b"real-audio"
+    assert outcome.artifacts[0]["mime_type"] == "audio/mpeg"

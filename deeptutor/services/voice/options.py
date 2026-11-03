@@ -168,6 +168,19 @@ def _tts_models(provider: str) -> tuple[list[dict], str]:
                 language_note="Saudi Arabic; enter a voice ID from the provider documentation.",
             ),
         ], "https://console.groq.com/docs/text-to-speech"
+    if provider == "macos_say":
+        return [
+            preset(
+                "macos-say",
+                voices=choices(["Tingting", "Reed"]),
+                formats=["mp3"],
+                speed={"min": 0.5, "max": 2, "step": 0.05},
+                configuration_note=(
+                    "Offline macOS say voices; requires ffmpeg for MP3 conversion. "
+                    "Voices look like Tingting or Reed."
+                ),
+            )
+        ], "https://ss64.com/osx/say.html"
     if provider == "edge":
         return [
             preset(
