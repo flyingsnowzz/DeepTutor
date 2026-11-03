@@ -11,6 +11,7 @@ import json
 import re
 from typing import Any
 
+from .duration_utils import parse_target_duration_seconds
 from .models import GeneratedCode
 
 _MATH_LINE = re.compile(
@@ -20,15 +21,25 @@ _MATH_LINE = re.compile(
 
 def _clean(value: Any, *, limit: int = 90) -> str:
     text = re.sub(r"\s+", " ", str(value or "")).strip(" \t\r\n-—:：")
+    text = re.split(
+        r"不要|无需|纯公式|即可|\bno geometry\b|\bplain formula text\b|\bonly\b",
+        text,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0].strip(" ,，。；;")
+    text = re.sub(r"\^2", "²", text)
+    text = re.sub(r"\^3", "³", text)
     return text[:limit].strip()
 
 
 def _teaching_lines(user_input: str, analysis: Any, design: Any) -> tuple[str, list[str]]:
     formulas = []
-    for match in _MATH_LINE.finditer(user_input):
-        line = _clean(match.group(0))
-        if line and line not in formulas:
-            formulas.append(line)
+    clauses = re.split(r"(?:，|,|。|；|;|\band\b|和|以及)", user_input, flags=re.IGNORECASE)
+    for clause in clauses:
+        for match in _MATH_LINE.finditer(clause):
+            line = _clean(match.group(0))
+            if line and line not in formulas:
+                formulas.append(line)
     candidates = formulas or [
         *list(getattr(design, "scene_outline", []) or []),
         *list(getattr(analysis, "narrative_steps", []) or []),
@@ -47,6 +58,10 @@ def _teaching_lines(user_input: str, analysis: Any, design: Any) -> tuple[str, l
 
 def structured_manim_code(*, user_input: str, analysis: Any, design: Any) -> GeneratedCode:
     title, lines = _teaching_lines(user_input, analysis, design)
+    duration = parse_target_duration_seconds(user_input) or 5.0
+    intro_seconds = 0.6
+    line_seconds = 0.65
+    final_wait = max(0.8, duration - intro_seconds - len(lines) * line_seconds)
     body = [
         "from manim import Scene, Text, Write, FadeIn, UP, DOWN",
         "",
@@ -54,7 +69,7 @@ def structured_manim_code(*, user_input: str, analysis: Any, design: Any) -> Gen
         "    def construct(self):",
         f"        title = Text({json.dumps(title, ensure_ascii=False)}, font_size=40)",
         "        title.to_edge(UP, buff=0.65)",
-        "        self.play(Write(title), run_time=0.6)",
+        f"        self.play(Write(title), run_time={intro_seconds})",
         "        previous = title",
     ]
     for line in lines:
@@ -62,11 +77,11 @@ def structured_manim_code(*, user_input: str, analysis: Any, design: Any) -> Gen
             [
                 f"        line = Text({json.dumps(line, ensure_ascii=False)}, font_size=34)",
                 "        line.next_to(previous, DOWN, buff=0.65)",
-                "        self.play(FadeIn(line, shift=DOWN * 0.2), run_time=0.65)",
+                f"        self.play(FadeIn(line, shift=DOWN * 0.2), run_time={line_seconds})",
                 "        previous = line",
             ]
         )
-    body.extend(["        self.wait(1.5)", ""])
+    body.extend([f"        self.wait({final_wait:.3f})", ""])
     return GeneratedCode(
         code="\n".join(body),
         rationale="DeepTutor structured Manim scene compiled from the teaching plan.",

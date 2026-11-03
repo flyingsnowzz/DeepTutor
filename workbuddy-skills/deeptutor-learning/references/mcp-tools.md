@@ -23,7 +23,7 @@
 | `quiz_judge_submit` / `quiz_judge_get` | quiz_judge | 主观/图片题异步判分（形成性反馈） |
 | `audio_overview_generate_submit/get` | audio_overview | 音频导学+逐字稿；`input.knowledge_bases` 必填，需可用 TTS 与 host/expert 两种声音 |
 | `lesson_video_generate_submit/get` | video_lesson | Remotion 交互式视频课；成功产物为 `lesson.zip`（内含浏览器播放的 `lesson.html`） |
-| `math_animation_generate_submit/get` | math_animator | Manim 动画（约 1–5 分钟） |
+| `math_animation_generate_submit/get` | math_animator | Manim 动画（约 1–5 分钟）；MCP 默认 `config.generation_mode="storyboard"`，即结构化 Manim 场景模式 |
 | `mastery_path_generate_submit/get` | mastery_path | 掌握路径生成 |
 
 - submit 返回：`job_id / session_id / status(queued|running) / poll_after_ms / billing{meter, charged_on:"job_succeeded"}`
@@ -31,6 +31,7 @@
 - 计费在作业**成功后**幂等发生；同一 `idempotency_key` 永远返回同一 job，不重复扣费。
 - 错误：`CAPABILITY_UNAVAILABLE`(503 缺依赖)、`QUOTA_EXCEEDED`(429，details.upgrade_url)、`JOB_CONFLICT`、`NOT_FOUND`。
 - needs_input 时用 `capability_job_reply` 补充，不要重新 submit。
+- `math_animator` 的结构化模式枚举值是 `storyboard`，不是 `structured`。`render.generation_mode="storyboard"` 就是结构化模式验收依据；`freeform` 才是自由代码生成。不要传顶层 `scenes` 或盲猜嵌套 `render.generation_mode`，应使用 `input.config={"generation_mode":"storyboard"}`。
 
 ### `artifact_get`
 - 入参：`artifact_ref`、`disposition?: "url"`
