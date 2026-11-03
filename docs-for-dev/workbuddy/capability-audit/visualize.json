@@ -1,0 +1,181 @@
+{
+  "capability": "visualize",
+  "status": "succeeded",
+  "elapsed_seconds": 36.399,
+  "placeholder_detected": false,
+  "submit": {
+    "ok": true,
+    "data": {
+      "job_id": "job_78790f9f719242e0b168ddec5849526e",
+      "session_id": "sess_b142f53f28e64034bbf027ab018cd4c6",
+      "status": "running",
+      "poll_after_ms": 1000,
+      "billing": {
+        "meter": "visualization",
+        "charged_on": "job_succeeded",
+        "idempotency": "same idempotency_key never charges twice"
+      }
+    },
+    "error": null
+  },
+  "final": {
+    "ok": true,
+    "data": {
+      "job_id": "job_78790f9f719242e0b168ddec5849526e",
+      "session_id": "sess_b142f53f28e64034bbf027ab018cd4c6",
+      "status": "succeeded",
+      "source_channel": "first_party",
+      "progress": null,
+      "result": {
+        "response": "```mermaid\nmindmap\n  root((立方体体积 V=a³))\n    棱长 a\n      每条棱长为 a\n      体积 = a × a × a\n      V 与棱长的立方成正比\n    单位小立方体堆叠\n      每条棱放 a 个小立方体\n      底面一层 a×a 个\n      共堆 a 层 → a×a×a 个\n      体积等于小立方体总数\n    棱长 3 时\n      底面 3×3=9 个\n      堆 3 层 → 9×3=27 个\n      V=3³=27\n```",
+        "schema_version": "deeptutor.visualization/v1",
+        "render_type": "mermaid",
+        "renderer": {
+          "id": "mermaid",
+          "version": "1.0.0",
+          "target": "native",
+          "native_renderer": "mermaid",
+          "entry_url": ""
+        },
+        "payload": {
+          "format": "text/vnd.mermaid",
+          "data": "mindmap\n  root((立方体体积 V=a³))\n    棱长 a\n      每条棱长为 a\n      体积 = a × a × a\n      V 与棱长的立方成正比\n    单位小立方体堆叠\n      每条棱放 a 个小立方体\n      底面一层 a×a 个\n      共堆 a 层 → a×a×a 个\n      体积等于小立方体总数\n    棱长 3 时\n      底面 3×3=9 个\n      堆 3 层 → 9×3=27 个\n      V=3³=27"
+        },
+        "presentation": {
+          "title": "立方体体积 V=a³",
+          "description": "通过思维导图讲解：棱长 a 决定堆叠方式，单位小立方体共 a×a×a 个，棱长 3 时体积为 27。",
+          "alt_text": "一个思维导图，从中心「立方体体积 V=a³」分出三支：棱长 a、单位小立方体堆叠、棱长 3 时，最后一支显示 V=3³=27。",
+          "aspect_ratio": ""
+        },
+        "interaction": {
+          "events": []
+        },
+        "fallback": {
+          "renderer": "svg"
+        },
+        "code": {
+          "language": "mermaid",
+          "content": "mindmap\n  root((立方体体积 V=a³))\n    棱长 a\n      每条棱长为 a\n      体积 = a × a × a\n      V 与棱长的立方成正比\n    单位小立方体堆叠\n      每条棱放 a 个小立方体\n      底面一层 a×a 个\n      共堆 a 层 → a×a×a 个\n      体积等于小立方体总数\n    棱长 3 时\n      底面 3×3=9 个\n      堆 3 层 → 9×3=27 个\n      V=3³=27"
+        },
+        "analysis": {
+          "render_type": "mermaid",
+          "description": "通过思维导图讲解：棱长 a 决定堆叠方式，单位小立方体共 a×a×a 个，棱长 3 时体积为 27。",
+          "engine": "chat_agent_loop",
+          "requested_type": "auto"
+        },
+        "review": {
+          "changed": false,
+          "review_notes": "Accepted by the installed visualizer validator."
+        },
+        "engine": "chat_agent_loop",
+        "loop": {
+          "response": "",
+          "completed": true,
+          "engine": "agent_loop",
+          "scheduler": "python",
+          "rounds": 1,
+          "settlement_rounds": 0,
+          "tool_steps": 1,
+          "metadata": {
+            "context_budget": {
+              "window": 16384,
+              "window_estimated": true,
+              "used_tokens": 8241,
+              "free_tokens": 8143,
+              "model": "spark-x2.6",
+              "counter": "cl100k_base",
+              "deferred_tool_count": 0,
+              "segments": [
+                {
+                  "key": "system_tools",
+                  "tokens": 2060
+                },
+                {
+                  "key": "messages",
+                  "tokens": 1760
+                },
+                {
+                  "key": "capability",
+                  "tokens": 1353
+                },
+                {
+                  "key": "tool_manifest",
+                  "tokens": 1311
+                },
+                {
+                  "key": "system_prompt",
+                  "tokens": 1012
+                },
+                {
+                  "key": "skills",
+                  "tokens": 457
+                },
+                {
+                  "key": "workspace",
+                  "tokens": 288
+                }
+              ]
+            }
+          }
+        },
+        "metadata": {
+          "cost_summary": {
+            "total_cost_usd": 0.00148515,
+            "total_tokens": 7183,
+            "total_calls": 1,
+            "prompt_tokens": 6277,
+            "completion_tokens": 906
+          },
+          "usage_summary": {
+            "prompt_tokens": 6277,
+            "completion_tokens": 906,
+            "total_tokens": 7183,
+            "cache_read_input_tokens": 1984,
+            "cache_creation_input_tokens": 0,
+            "reasoning_tokens": 0,
+            "duration_seconds": 29.543920916999923,
+            "total_calls": 1,
+            "cache_reported_calls": 1,
+            "cache_input_tokens": 6277,
+            "cache_hit_rate": 0.3160745579098295,
+            "ttft_seconds": 4.612088041998504,
+            "ttft_calls": 1,
+            "generation_seconds": 24.9198902499993,
+            "timed_completion_tokens": 906,
+            "tokens_per_second": 36.356500406338085,
+            "estimated_calls": 0,
+            "call_details": [
+              {
+                "call_id": "8d7497825a4845d0a1db1ebb07b5ad83",
+                "prompt_tokens": 6277,
+                "completion_tokens": 906,
+                "total_tokens": 7183,
+                "cache_read_input_tokens": 1984,
+                "model": "spark-x2.6",
+                "provider": "custom",
+                "status": "completed",
+                "estimated": false,
+                "duration_seconds": 29.543920916999923,
+                "ttft_seconds": 4.612088041998504,
+                "generation_seconds": 24.9198902499993,
+                "tokens_per_second": 36.356500406338085,
+                "cache_hit_rate": 0.3160745579098295
+              }
+            ]
+          }
+        }
+      },
+      "artifacts": [
+        {
+          "artifact_ref": "art_d5ef2f7adad249be8428080c834c7159",
+          "kind": "visualization_source",
+          "mime_type": "text/vnd.mermaid",
+          "title": "visualization.mmd"
+        }
+      ],
+      "needs_input": null,
+      "error": null
+    },
+    "error": null
+  }
+}

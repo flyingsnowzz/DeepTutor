@@ -1,0 +1,7 @@
+{
+  "capability": "math_animator",
+  "job_id": "job_1334aa34b64c4866b4fcd6fba395917f",
+  "status": "canceled",
+  "error": "{\"code\": \"JOB_CANCELED\", \"message\": \"Job canceled\", \"retryable\": false}",
+  "input": "{\"prompt\": \"生成约 10 秒数学动画，展示棱长为 a 的立方体由 a×a×a 个单位小立方体组成。\"}"
+}

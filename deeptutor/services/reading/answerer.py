@@ -25,6 +25,8 @@ class ReadingAnswer:
     content: str
     citations: list[CitedSegment]
     followups: tuple[str, ...] = ()
+    engine: str = "deterministic"
+    degraded: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -39,6 +41,8 @@ class ReadingAnswer:
                 for c in self.citations
             ],
             "followups": list(self.followups),
+            "engine": self.engine,
+            "degraded": self.degraded,
         }
 
 

@@ -1,0 +1,192 @@
+{
+  "capability": "problem_solve",
+  "status": "succeeded",
+  "elapsed_seconds": 82.822,
+  "placeholder_detected": false,
+  "submit": {
+    "ok": true,
+    "data": {
+      "job_id": "job_31e672078a2c487a94a29ef0ae4f0c7d",
+      "session_id": "sess_0fbf5237cf0f440e9356c40995abe777",
+      "status": "running",
+      "poll_after_ms": 1000,
+      "billing": {
+        "meter": "solve",
+        "charged_on": "job_succeeded",
+        "idempotency": "same idempotency_key never charges twice"
+      }
+    },
+    "error": null
+  },
+  "final": {
+    "ok": true,
+    "data": {
+      "job_id": "job_31e672078a2c487a94a29ef0ae4f0c7d",
+      "session_id": "sess_0fbf5237cf0f440e9356c40995abe777",
+      "status": "succeeded",
+      "source_channel": "first_party",
+      "progress": null,
+      "result": {
+        "response": "## 求解 $x^2 - 4x + 3 = 0$\n\n### 第一步：因式分解\n\n观察常数项 $3 = 1 \\times 3$，且一次项系数 $-4 = -(1+3)$，因此可以分解为：\n\n$$x^2 - 4x + 3 = (x-1)(x-3) = 0$$\n\n### 第二步：由零因子性质求根\n\n两个因式相乘为零，说明至少一个因式为零：\n\n- $x - 1 = 0 \\Rightarrow \\boxed{x = 1}$\n- $x - 3 = 0 \\Rightarrow \\boxed{x = 3}$\n\n### 第三步：代入原方程核对\n\n**核对 $x = 1$：**\n\n$$1^2 - 4 \\times 1 + 3 = 1 - 4 + 3 = 0 \\quad \\checkmark$$\n\n**核对 $x = 3$：**\n\n$$3^2 - 4 \\times 3 + 3 = 9 - 12 + 3 = 0 \\quad \\checkmark$$\n\n### 附加验证（韦达定理）\n\n对 $ax^2 + bx + c = 0$（此处 $a=1, b=-4, c=3$）：\n\n- 两根之和：$1 + 3 = 4 = -\\dfrac{b}{a} = -\\dfrac{-4}{1}$ ✓\n- 两根之积：$1 \\times 3 = 3 = \\dfrac{c}{a} = \\dfrac{3}{1}$ ✓\n\n### 结论\n\n方程 $x^2 - 4x + 3 = 0$ 的两个根为 **$x = 1$** 和 **$x = 3$**，代入验证与韦达定理均确认无误。",
+        "completed": true,
+        "engine": "agent_loop",
+        "scheduler": "python",
+        "rounds": 5,
+        "settlement_rounds": 0,
+        "tool_steps": 4,
+        "metadata": {
+          "context_budget": {
+            "window": 16384,
+            "window_estimated": true,
+            "used_tokens": 13406,
+            "free_tokens": 2978,
+            "model": "spark-x2.6",
+            "counter": "cl100k_base",
+            "deferred_tool_count": 0,
+            "segments": [
+              {
+                "key": "system_tools",
+                "tokens": 4736
+              },
+              {
+                "key": "messages",
+                "tokens": 3405
+              },
+              {
+                "key": "tool_manifest",
+                "tokens": 2751
+              },
+              {
+                "key": "system_prompt",
+                "tokens": 1012
+              },
+              {
+                "key": "capability",
+                "tokens": 756
+              },
+              {
+                "key": "skills",
+                "tokens": 457
+              },
+              {
+                "key": "workspace",
+                "tokens": 289
+              }
+            ]
+          },
+          "cost_summary": {
+            "total_cost_usd": 0.008290049999999998,
+            "total_tokens": 49012,
+            "total_calls": 5,
+            "prompt_tokens": 46927,
+            "completion_tokens": 2085
+          },
+          "usage_summary": {
+            "prompt_tokens": 46927,
+            "completion_tokens": 2085,
+            "total_tokens": 49012,
+            "cache_read_input_tokens": 28416,
+            "cache_creation_input_tokens": 0,
+            "reasoning_tokens": 0,
+            "duration_seconds": 76.27606108399414,
+            "total_calls": 5,
+            "cache_reported_calls": 4,
+            "cache_input_tokens": 37375,
+            "cache_hit_rate": 0.7602943143812709,
+            "ttft_seconds": 4.413620799998898,
+            "ttft_calls": 5,
+            "generation_seconds": 54.19878199999948,
+            "timed_completion_tokens": 2085,
+            "tokens_per_second": 38.469499185424866,
+            "estimated_calls": 0,
+            "call_details": [
+              {
+                "call_id": "cde3985538cd4f50b0789d80281f2980",
+                "prompt_tokens": 9216,
+                "completion_tokens": 149,
+                "total_tokens": 9365,
+                "cache_read_input_tokens": 768,
+                "model": "spark-x2.6",
+                "provider": "custom",
+                "status": "completed",
+                "estimated": false,
+                "duration_seconds": 6.807348499998625,
+                "ttft_seconds": 2.499780666999868,
+                "generation_seconds": 4.3042964999986,
+                "tokens_per_second": 34.61657439259783,
+                "cache_hit_rate": 0.08333333333333333
+              },
+              {
+                "call_id": "474132b5bd894515881581eb022c7aff",
+                "prompt_tokens": 9552,
+                "completion_tokens": 221,
+                "total_tokens": 9773,
+                "model": "spark-x2.6",
+                "provider": "custom",
+                "status": "completed",
+                "estimated": false,
+                "duration_seconds": 7.270186334000755,
+                "ttft_seconds": 2.376671500001976,
+                "generation_seconds": 4.892325917000562,
+                "tokens_per_second": 45.17278769839049,
+                "cache_hit_rate": null
+              },
+              {
+                "call_id": "35c62f56b44d44d0a17e87fd9a50e74b",
+                "prompt_tokens": 9326,
+                "completion_tokens": 203,
+                "total_tokens": 9529,
+                "cache_read_input_tokens": 9152,
+                "model": "spark-x2.6",
+                "provider": "custom",
+                "status": "completed",
+                "estimated": false,
+                "duration_seconds": 19.453255124997668,
+                "ttft_seconds": 12.918109791997267,
+                "generation_seconds": 6.534098500000255,
+                "tokens_per_second": 31.067789994287978,
+                "cache_hit_rate": 0.9813424833797985
+              },
+              {
+                "call_id": "050aa0d4ff0340bc9d605fadea8c49e1",
+                "prompt_tokens": 9387,
+                "completion_tokens": 835,
+                "total_tokens": 10222,
+                "cache_read_input_tokens": 9216,
+                "model": "spark-x2.6",
+                "provider": "custom",
+                "status": "completed",
+                "estimated": false,
+                "duration_seconds": 25.988552374998108,
+                "ttft_seconds": 2.080991457998607,
+                "generation_seconds": 23.906140082999627,
+                "tokens_per_second": 34.9282651695743,
+                "cache_hit_rate": 0.9817833173537871
+              },
+              {
+                "call_id": "0b838dc3f10f430aa71b3fae84b82a26",
+                "prompt_tokens": 9446,
+                "completion_tokens": 677,
+                "total_tokens": 10123,
+                "cache_read_input_tokens": 9280,
+                "model": "spark-x2.6",
+                "provider": "custom",
+                "status": "completed",
+                "estimated": false,
+                "duration_seconds": 16.75671874999898,
+                "ttft_seconds": 2.1925505829967733,
+                "generation_seconds": 14.561921000000439,
+                "tokens_per_second": 46.49111885718784,
+                "cache_hit_rate": 0.9824264238831252
+              }
+            ]
+          }
+        }
+      },
+      "artifacts": [],
+      "needs_input": null,
+      "error": null
+    },
+    "error": null
+  }
+}

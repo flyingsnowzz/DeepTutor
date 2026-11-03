@@ -90,12 +90,19 @@ class LLMReadingAnswerer:
             text = await client.complete(prompt, system_prompt=SYSTEM_PROMPT, history=llm_history)
         except Exception:  # noqa: BLE001
             logger.warning("LLM reading answer failed; using deterministic fallback", exc_info=True)
-            return await self._fallback.answer(
+            fallback = await self._fallback.answer(
                 question=question,
                 mode=mode,
                 material_title=material_title,
                 segments=segments,
                 history=history,
+            )
+            return ReadingAnswer(
+                content=fallback.content,
+                citations=fallback.citations,
+                followups=fallback.followups,
+                engine="llm_fallback",
+                degraded=True,
             )
 
         citations = self._citations_from_markers(text, hits) or [
@@ -111,6 +118,7 @@ class LLMReadingAnswerer:
             content=text.strip(),
             citations=citations,
             followups=("逐段总结", "出复习题", "再深入讲讲这一段"),
+            engine="llm",
         )
 
     @staticmethod

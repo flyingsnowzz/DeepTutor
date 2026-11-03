@@ -1,0 +1,7 @@
+{
+  "capability": "video_lesson",
+  "job_id": "job_af5823ea8af64260bdae21e50bc4e89b",
+  "status": "canceled",
+  "error": "{\"code\": \"JOB_CANCELED\", \"message\": \"Job canceled\", \"retryable\": false}",
+  "input": "{\"prompt\": \"生成约 20 秒的立方体体积视频课，解释 V=a³ 和棱长 3 体积 27。\"}"
+}

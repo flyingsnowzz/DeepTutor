@@ -1,0 +1,57 @@
+{
+  "capability": "immersive_reading",
+  "status": "succeeded",
+  "elapsed_seconds": 13.935,
+  "placeholder_detected": false,
+  "material": {
+    "ok": true,
+    "data": {
+      "material_id": "mat_7ac9f2da79784b4481c7",
+      "kind": "text",
+      "title": "立方体体积讲义",
+      "segment_count": 1,
+      "locator_types": [
+        "section"
+      ]
+    },
+    "error": null
+  },
+  "session": {
+    "ok": true,
+    "data": {
+      "session_id": "rsess_cff6815b42c9458091c5",
+      "material_id": "mat_7ac9f2da79784b4481c7",
+      "title": "立方体体积讲义",
+      "kind": "text",
+      "mode": "study",
+      "segment_count": 1,
+      "is_interactive": true,
+      "note": "精读为实时会话，不是一次性作业；逐段总结/提问/复习题均带页码、章节或时间戳引用。"
+    },
+    "error": null
+  },
+  "reply": {
+    "ok": true,
+    "data": {
+      "session_id": "rsess_cff6815b42c9458091c5",
+      "mode": "study",
+      "content": "- 体积公式：V=a×a×a=a³ [1]\n- 棱长为 3 时：V=27 [1]",
+      "citations": [
+        {
+          "ordinal": 1,
+          "locator_type": "section",
+          "locator": "立方体体积讲义",
+          "snippet": "第一节 棱长\n立方体的长、宽、高都等于 a。\n\n第二节 体积\n立方体体积 V=a×a×a=a³。棱长为 3 时，V=27。"
+        }
+      ],
+      "followups": [
+        "逐段总结",
+        "出复习题",
+        "再深入讲讲这一段"
+      ],
+      "engine": "llm",
+      "degraded": false
+    },
+    "error": null
+  }
+}

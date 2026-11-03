@@ -21,7 +21,7 @@
 | `quiz_generate_submit` / `quiz_generate_job_get` | deep_question | 出题练习 |
 | `problem_solve_submit` / `problem_solve_get` | problem_solve | 分步解题+同类题 |
 | `quiz_judge_submit` / `quiz_judge_get` | quiz_judge | 主观/图片题异步判分（形成性反馈） |
-| `audio_overview_generate_submit/get` | audio_overview | 音频导学+逐字稿 |
+| `audio_overview_generate_submit/get` | audio_overview | 音频导学+逐字稿；`input.knowledge_bases` 必填，需可用 TTS 与 host/expert 两种声音 |
 | `lesson_video_generate_submit/get` | video_lesson | Remotion 视频课（约 2–8 分钟） |
 | `math_animation_generate_submit/get` | math_animator | Manim 动画（约 1–5 分钟） |
 | `mastery_path_generate_submit/get` | mastery_path | 掌握路径生成 |
@@ -54,7 +54,7 @@
 
 | 工具 | 入参 | 说明 |
 | --- | --- | --- |
-| `practice_entry_create` | `question / correct_answer / question_type? / options? / explanation? / knowledge_point_id? / mastery_path_id? / difficulty?` | 宿主自有题源或宿主模型生成题目入题库，返回 `entry_id`。优先用它承接 WorkBuddy 生成的内容，避免双端重复调模型 |
+| `practice_entry_create` | `question / correct_answer / question_type? / options? / explanation? / knowledge_point_id? / mastery_path_id? / difficulty?` | 用户自有题或明确由宿主预先生成的现成题入库，返回 `entry_id`；不是 DeepTutor 出题的默认替代路径 |
 | `practice_question_get` | `entry_id` | 取题面（不含判分过程） |
 | `practice_answer_check` | `entry_id / answer / request_id` | 确定性判分；答错自动建 SRS 错题行；挂掌握路径时写掌握证据事件 |
 | `practice_review_submit` | `entry_id / rating(again|hard|good|easy) / request_id` | SM-2-lite 调度，返回下次 `due_at` |

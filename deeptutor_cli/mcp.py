@@ -45,11 +45,19 @@ def serve(
             from deeptutor.services.practice.postgres import PostgresPracticeRepository
             from deeptutor.services.reading.service import ReadingService
 
+            reading_answerer = None
+            if not deterministic or os.environ.get("DEEPTUTOR_READING_LLM") == "1":
+                from deeptutor.services.reading.llm_answerer import LLMReadingAnswerer
+
+                reading_answerer = LLMReadingAnswerer()
+
             engine = create_engine(os.environ["DATABASE_URL"])
             extras = {
                 "practice_repo": PostgresPracticeRepository(engine),
                 "mastery_repo": PostgresMasteryRepository(engine),
-                "reading_service": ReadingService(engine, object_store=store),
+                "reading_service": ReadingService(
+                    engine, object_store=store, answerer=reading_answerer
+                ),
                 "hook_service": HookService(engine),
             }
         server = create_mcp_server(

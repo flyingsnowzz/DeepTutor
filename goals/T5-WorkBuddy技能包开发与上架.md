@@ -37,10 +37,10 @@
 
 ### 模型调用边界
 
-- WorkBuddy 负责意图理解、对话组织、简单讲解和普通题目生成；
-- DeepTutor 负责复杂 Agent 管线、资料精读、判题、练习/掌握度/SRS 状态和教学产物；
-- 普通题目由宿主生成后通过 `practice_entry_create` 入库，不再调用 `quiz_generate_submit` 重复生成；
-- 只有学习状态驱动、复杂校验或多阶段生成任务才调用 DeepTutor 模型管线。
+- WorkBuddy 负责意图理解、工具选择、过程说明和结果呈现；
+- DeepTutor 负责解题、出题、研究、精读、判分、掌握路径和教学产物等实际学习生产；
+- `practice_entry_create` 只承接用户/宿主已有的现成题，不作为宿主替代 DeepTutor 出题的默认路径；
+- 能力不可用、超时、占位或主题不符必须明确失败，宿主不得静默代做。
 
 ## 1. 技能包规划
 
@@ -451,6 +451,13 @@ python -m scripts.workbuddy.e2e.host_driven_practice
 ```
 
 必须保留 WorkBuddy 连接指示灯截图、工具调用日志、四条 E2E 记录、安全扫描报告和待提交 zip 路径。
+
+## 后续真实能力审计（2026-11-03）
+
+- 发现占位 runner、能力映射、交互续跑、精读回答器和媒体产物收集问题后，已改为真实执行并补充审计：`docs-for-dev/workbuddy/capability-audit/README.md`。
+- 已通过真实产出验收：解题、出题、判分、精读、可视化和掌握路径。
+- 仍需后续专项处理：完整研究的长上下文稳定性、可用 TTS、视频/动画长代码生成稳定性；这些能力不得再因 `succeeded` 或宿主兜底而视为验收通过。
+- WorkBuddy 客户端已复验真实 visualize 产物，截图：`docs-for-dev/workbuddy/capability-audit/workbuddy-visualize-real.png`。
 
 ## 非目标
 

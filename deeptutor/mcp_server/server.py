@@ -129,7 +129,10 @@ def create_mcp_server(
                 }
             )
         await _audit(ctx, principal, "capabilities_list", status="ok")
-        return ok({"capabilities": data, "plan": principal.plan})
+        execution_mode = (
+            "deterministic" if isinstance(jobs.runner, DeterministicCapabilityRunner) else "real"
+        )
+        return ok({"capabilities": data, "plan": principal.plan, "execution_mode": execution_mode})
 
     # ---------------------------------------------------------------- job tools
     async def _submit(

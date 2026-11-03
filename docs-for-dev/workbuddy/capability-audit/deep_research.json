@@ -1,0 +1,7 @@
+{
+  "capability": "deep_research",
+  "job_id": "job_b57f62efceaf499fba2d3f6e961c9998",
+  "status": "canceled",
+  "error": "{\"code\": \"JOB_CANCELED\", \"message\": \"Job canceled\", \"retryable\": false}",
+  "input": "{\"prompt\": \"用快速研究模式，简要说明立方体体积公式 V=a³ 的含义，给出两点教学要点。\", \"config\": {\"mode\": \"notes\", \"depth\": \"quick\"}}"
+}

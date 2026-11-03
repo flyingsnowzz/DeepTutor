@@ -36,6 +36,7 @@ async def wait_job_payload(server, job_id):
 async def test_lists_capabilities():
     server = create_mcp_server(owner_user_id="user-a")
     payload = await _call(server, "capabilities_list", {})
+    assert payload["data"]["execution_mode"] == "deterministic"
     names = {item["name"] for item in payload["data"]["capabilities"]}
     assert {"deep_research", "visualize", "deep_question"} <= names
 

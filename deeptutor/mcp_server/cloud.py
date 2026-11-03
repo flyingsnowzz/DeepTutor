@@ -18,6 +18,7 @@ from deeptutor.services.auth.config import AuthConfig, load_auth_config
 from deeptutor.services.auth.service import AuthService
 from deeptutor.services.hooks import HookService
 from deeptutor.services.jobs.postgres import PostgresJobService
+from deeptutor.services.jobs.runner import DeterministicCapabilityRunner
 from deeptutor.services.postgres.database import create_engine
 from deeptutor.services.practice.postgres import PostgresPracticeRepository
 from deeptutor.services.quota.plans import metric_for_capability
@@ -109,7 +110,9 @@ def build_cloud_app(
     practice = PostgresPracticeRepository(engine)
     mastery = PostgresMasteryRepository(engine)
     reading_answerer = None
-    if os.environ.get("DEEPTUTOR_READING_LLM") == "1":
+    if not isinstance(runner, DeterministicCapabilityRunner) or os.environ.get(
+        "DEEPTUTOR_READING_LLM"
+    ) == "1":
         from deeptutor.services.reading.llm_answerer import LLMReadingAnswerer
 
         reading_answerer = LLMReadingAnswerer()

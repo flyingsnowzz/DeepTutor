@@ -73,7 +73,10 @@ class InMemoryJobService:
         job.started_at = time.time()
         job.updated_at = job.started_at
         try:
-            outcome = await self.runner.run(capability=job.capability, payload=job.input)
+            outcome = await self.runner.run(
+                capability=job.capability,
+                payload={**job.input, "owner_user_id": job.owner_user_id},
+            )
             for item in outcome.artifacts:
                 data = item["data"]
                 key = item.get("key") or f"{job.owner_user_id}/{job.id}/{item['key_suffix']}"

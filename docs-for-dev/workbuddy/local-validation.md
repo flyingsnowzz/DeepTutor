@@ -95,8 +95,8 @@ python -m pytest tests/workbuddy_skills -q
 | 完整“今日复习”对话 | `workbuddy-review-e2e-full.png`、`e2e/07-workbuddy-desktop-review.json` | `practice_summary_get` + `review_tasks_list` 返回真实统计，31 秒完成 |
 | WorkBuddy 宿主生成 5 题并写库 | `host-generated-practice-tools.png`、`host-generated-practice-e2e.png`、`e2e/08-workbuddy-skill-host-generated-practice.json` | 客户端明确显示“由我生成”，随后调用 `practice_entry_create`；PostgreSQL 查到对应 5 条 `skill_managed` 记录 |
 
-- 第 8 条场景同时验证了模型分工：未调用 `quiz_generate_submit`，没有让 DeepTutor
-  再生成一份题目；它只承担能力检查和练习入库。
+- 第 8 条场景只验证“现成题目入库”能力，不是 DeepTutor 默认出题路径。后续路由已修正：
+  用户显式使用 DeepTutor Skill 时，默认通过 `quiz_generate_submit` 实际出题，宿主不得代做。
 - 仅输入自然语言“今天复习什么？”时，WorkBuddy 可能先询问学习方向；因此上架示例和
   README 使用明确的 `/deeptutor-learning ...` 触发方式，不把自然语言路由稳定性夸大成确定行为。
 
@@ -128,7 +128,18 @@ python -m pytest tests/workbuddy_skills -q
 安装与联调路径可在无既有 Python 包的干净环境中复现；WorkBuddy 桌面端安装则由上述
 真实客户端截图单独证明。
 
-## 6. 当前仍需外部条件完成的事项
+## 6. 后续真实能力审计与客户端复验
+
+完整审计见 [`capability-audit/README.md`](./capability-audit/README.md)。真实模式已验证：
+解题、出题、判分、精读、可视化和掌握路径均有本领域实际产出；研究、音频、视频和
+数学动画仍有模型稳定性或外部依赖阻塞，不再用协议成功代替能力验收。
+
+WorkBuddy 重启后已确认实际进程为 `DEEPTUTOR_MCP_DETERMINISTIC=0`。简化后的真实
+visualize 请求由 DeepTutor 返回正确 Mermaid，并在客户端展示，证据：
+[`capability-audit/workbuddy-visualize-real.png`](./capability-audit/workbuddy-visualize-real.png)。
+较复杂请求曾发生模型停滞，因此同时增加服务端能力超时和结果有效性校验。
+
+## 7. 当前仍需外部条件完成的事项
 
 - **WorkBuddy 开放平台提交**：需平台账号与客户端审核入口，内部 zip 已就绪。
 - **运营占位信息替换**：`listing/support-contact.md` 中的支持/安全邮箱和示例域名需换成

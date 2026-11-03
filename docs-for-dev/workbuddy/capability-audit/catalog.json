@@ -1,0 +1,136 @@
+{
+  "ok": true,
+  "data": {
+    "capabilities": [
+      {
+        "name": "deep_research",
+        "display_name": "深度研究",
+        "status": "ready",
+        "supports_jobs": true,
+        "missing_dependencies": [],
+        "estimated_duration_sec": 60,
+        "cost_hint": {
+          "meter": "research",
+          "billed_event": "job_succeeded"
+        }
+      },
+      {
+        "name": "visualize",
+        "display_name": "可视化讲解",
+        "status": "ready",
+        "supports_jobs": true,
+        "missing_dependencies": [],
+        "estimated_duration_sec": 20,
+        "cost_hint": {
+          "meter": "visualization",
+          "billed_event": "job_succeeded"
+        }
+      },
+      {
+        "name": "deep_question",
+        "display_name": "出题练习",
+        "status": "ready",
+        "supports_jobs": true,
+        "missing_dependencies": [],
+        "estimated_duration_sec": 30,
+        "cost_hint": {
+          "meter": "question",
+          "billed_event": "job_succeeded"
+        }
+      },
+      {
+        "name": "problem_solve",
+        "display_name": "分步解题",
+        "status": "ready",
+        "supports_jobs": true,
+        "missing_dependencies": [],
+        "estimated_duration_sec": 45,
+        "cost_hint": {
+          "meter": "solve",
+          "billed_event": "job_succeeded"
+        }
+      },
+      {
+        "name": "quiz_judge",
+        "display_name": "主观题判分",
+        "status": "ready",
+        "supports_jobs": true,
+        "missing_dependencies": [],
+        "estimated_duration_sec": 30,
+        "cost_hint": {
+          "meter": "judge",
+          "billed_event": "job_succeeded",
+          "formative_only": true
+        }
+      },
+      {
+        "name": "audio_overview",
+        "display_name": "音频导学",
+        "status": "ready",
+        "supports_jobs": true,
+        "missing_dependencies": [],
+        "estimated_duration_sec": 120,
+        "cost_hint": {
+          "meter": "media",
+          "billed_event": "job_succeeded",
+          "media": true
+        }
+      },
+      {
+        "name": "mastery_path",
+        "display_name": "掌握路径生成",
+        "status": "ready",
+        "supports_jobs": true,
+        "missing_dependencies": [],
+        "estimated_duration_sec": 60,
+        "cost_hint": {
+          "meter": "mastery",
+          "billed_event": "job_succeeded"
+        }
+      },
+      {
+        "name": "video_lesson",
+        "display_name": "视频课",
+        "status": "ready",
+        "supports_jobs": true,
+        "missing_dependencies": [],
+        "estimated_duration_sec": 300,
+        "cost_hint": {
+          "meter": "media",
+          "billed_event": "job_succeeded",
+          "media": true,
+          "notice": "渲染耗时约 2–8 分钟，按 TTS/模型用量计费"
+        }
+      },
+      {
+        "name": "math_animator",
+        "display_name": "数学动画",
+        "status": "ready",
+        "supports_jobs": true,
+        "missing_dependencies": [],
+        "estimated_duration_sec": 240,
+        "cost_hint": {
+          "meter": "media",
+          "billed_event": "job_succeeded",
+          "media": true,
+          "notice": "Manim/LaTeX/ffmpeg 渲染耗时约 1–5 分钟"
+        }
+      },
+      {
+        "name": "immersive_reading",
+        "display_name": "沉浸式精读",
+        "status": "ready",
+        "supports_jobs": false,
+        "missing_dependencies": [],
+        "estimated_duration_sec": 0,
+        "cost_hint": {
+          "meter": "practice",
+          "billed_event": "per_reply"
+        }
+      }
+    ],
+    "plan": "free",
+    "execution_mode": "real"
+  },
+  "error": null
+}

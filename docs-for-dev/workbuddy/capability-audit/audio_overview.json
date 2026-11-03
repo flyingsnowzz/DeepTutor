@@ -1,0 +1,7 @@
+{
+  "capability": "audio_overview",
+  "job_id": "job_0f414151028443eeb83307e75cb4c59e",
+  "status": "failed",
+  "error": "{\"code\": \"JOB_FAILED\", \"message\": \"Capability run failed\", \"retryable\": false}",
+  "input": "{\"prompt\": \"生成约 30 秒的立方体体积音频导学，解释 V=a³，并给出棱长 3 时体积 27 的例子。\", \"knowledge_bases\": [\"capability-audit-cube-v2\"], \"config\": {\"target_minutes\": 1, \"host_voice\": \"zh-CN-XiaoxiaoNeural\", \"expert_voice\": \"zh-CN-YunxiNeural\"}}"
+}

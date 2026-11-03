@@ -147,7 +147,10 @@ class PostgresJobService:
         terminal_outcome = None
         terminal_error = None
         try:
-            outcome = await self.runner.run(capability=job.capability, payload=job.input)
+            outcome = await self.runner.run(
+                capability=job.capability,
+                payload={**job.input, "owner_user_id": job.owner_user_id},
+            )
             artifacts: list[ArtifactRecord] = []
             for item in outcome.artifacts:
                 data = item["data"]

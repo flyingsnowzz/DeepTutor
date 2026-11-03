@@ -45,6 +45,14 @@ def media_dependencies() -> dict[str, DependencyStatus]:
     if not ffmpeg:
         missing_video.append("ffmpeg")
 
+    missing_audio = []
+    try:
+        from deeptutor.services.config.provider_runtime import resolve_tts_runtime_config
+
+        resolve_tts_runtime_config()
+    except Exception:  # noqa: BLE001 - readiness is a report, not an exception path
+        missing_audio.append("active TTS model (speech synthesis)")
+
     # Reading needs PyMuPDF for PDF ingestion; text/transcript work without it.
     missing_reading = [] if _has_module("fitz") else ["PyMuPDF (PDF ingestion only)"]
 
@@ -52,5 +60,5 @@ def media_dependencies() -> dict[str, DependencyStatus]:
         "math_animator": DependencyStatus(not missing_manim, missing_manim),
         "video_lesson": DependencyStatus(not missing_video, missing_video),
         "immersive_reading": DependencyStatus(True, missing_reading),
-        "audio_overview": DependencyStatus(True, []),
+        "audio_overview": DependencyStatus(not missing_audio, missing_audio),
     }

@@ -1,0 +1,187 @@
+{
+  "capability": "deep_question",
+  "status": "succeeded",
+  "elapsed_seconds": 143.283,
+  "placeholder_detected": false,
+  "submit": {
+    "ok": true,
+    "data": {
+      "job_id": "job_1950a3f5543e40059628155158a13a33",
+      "session_id": "sess_e6de7af27f09457d986fb474967fb2ff",
+      "status": "running",
+      "poll_after_ms": 1000,
+      "billing": {
+        "meter": "question",
+        "charged_on": "job_succeeded",
+        "idempotency": "same idempotency_key never charges twice"
+      }
+    },
+    "error": null
+  },
+  "final": {
+    "ok": true,
+    "data": {
+      "job_id": "job_1950a3f5543e40059628155158a13a33",
+      "session_id": "sess_e6de7af27f09457d986fb474967fb2ff",
+      "status": "succeeded",
+      "source_channel": "first_party",
+      "progress": null,
+      "result": {
+        "response": "已围绕立方体体积公式 $V=a^3$ 完成取材：本题为课标内基础几何内容，无需外部资料；无历史出题记录可诊断，故按「自动难度」设为**中等**（初中起始水平），考点落在公式的**乘方结构**上，而非简单套算。\n\n出题思路：初学者最典型的错误是把 $(2a)^3$ 算成 $2a^3$ 或 $3a^3$，因此干扰项刻意对应这两类认知偏差，而不是随手编造的数字。\n\n**题目**：把一个正方体的棱长扩大到原来的 2 倍，则它的体积扩大到原来的（　）倍。\n\nA. 2　B. 4　C. 8　D. 6\n\n**答案：C**\n\n**解析**：设原棱长为 $a$，则原体积 $V_1=a^3$。棱长扩大 2 倍后为 $2a$，新体积\n$$V_2=(2a)^3=2^3\\cdot a^3=8a^3=8V_1$$\n所以体积扩大到原来的 8 倍，选 C。关键在于 $(2a)^3$ 要把系数 $2$ 一并乘三次方，即 $2^3=8$；误算成 $2a^3$（选 A）是漏掉系数的乘方，误算成 $3a^3=6a^3$（选 D）是把「乘 2」错当成「乘 3」，而选 B 则是把体积的三次方关系记成了面积的二次方关系。\n\n现在为你出 1 道题。",
+        "summary": {
+          "success": true,
+          "source": "topic",
+          "requested": 1,
+          "template_count": 1,
+          "completed": 1,
+          "failed": 0,
+          "templates": [
+            {
+              "question_id": "q_1",
+              "topic": "立方体体积 V=a³ 在棱长扩大到原来 2 倍时的乘方运算：(2a)³=8a³",
+              "question_type": "choice",
+              "difficulty": "medium",
+              "source": "custom",
+              "reference_question": null,
+              "reference_answer": null
+            }
+          ],
+          "results": [
+            {
+              "qa_pair": {
+                "question_id": "q_1",
+                "question": "关于立方体体积公式 V=a³，当棱长扩大到原来的 2 倍时，体积会变成原来的多少倍？",
+                "question_type": "choice",
+                "options": {
+                  "A": "2倍",
+                  "B": "4倍",
+                  "C": "6倍",
+                  "D": "8倍"
+                },
+                "correct_answer": "D",
+                "explanation": "根据立方体体积公式 V=a³，当棱长扩大到原来的 2 倍时，新的棱长为 2a，新的体积为 (2a)³=8a³，是原来体积的 8 倍。",
+                "difficulty": "medium",
+                "concentration": "立方体体积 V=a³ 在棱长扩大到原来 2 倍时的乘方运算：(2a)³=8a³"
+              },
+              "metadata": {}
+            }
+          ],
+          "analysis": "围绕立方体体积公式 V=a³ 的乘方结构设置 1 道四选一选择题，重点考查棱长按比例放缩后体积的变化，难度设为中等。"
+        },
+        "mode": "custom",
+        "metadata": {
+          "cost_summary": {
+            "total_cost_usd": 0.005687699999999999,
+            "total_tokens": 25861,
+            "total_calls": 5,
+            "prompt_tokens": 21842,
+            "completion_tokens": 4019
+          },
+          "usage_summary": {
+            "prompt_tokens": 21842,
+            "completion_tokens": 4019,
+            "total_tokens": 25861,
+            "cache_read_input_tokens": 9408,
+            "cache_creation_input_tokens": 0,
+            "reasoning_tokens": 0,
+            "duration_seconds": 137.64957449900612,
+            "total_calls": 5,
+            "cache_reported_calls": 3,
+            "cache_input_tokens": 19687,
+            "cache_hit_rate": 0.4778788032711942,
+            "ttft_seconds": 6.496152066400827,
+            "ttft_calls": 5,
+            "generation_seconds": 105.16040575000079,
+            "timed_completion_tokens": 4019,
+            "tokens_per_second": 38.217806134700744,
+            "estimated_calls": 0,
+            "call_details": [
+              {
+                "call_id": "5aa633fe48c34c7c99bfb72d704fa94c",
+                "prompt_tokens": 5950,
+                "completion_tokens": 1070,
+                "total_tokens": 7020,
+                "cache_read_input_tokens": 768,
+                "model": "spark-x2.6",
+                "provider": "custom",
+                "status": "interrupted",
+                "estimated": false,
+                "duration_seconds": 44.344359333001194,
+                "ttft_seconds": 9.204522625001118,
+                "generation_seconds": 35.13699983300103,
+                "tokens_per_second": 30.452229987918464,
+                "cache_hit_rate": 0.12907563025210084
+              },
+              {
+                "call_id": "1932aabed9ee4b078f562d53baeabf4e",
+                "prompt_tokens": 7079,
+                "completion_tokens": 533,
+                "total_tokens": 7612,
+                "cache_read_input_tokens": 5888,
+                "model": "spark-x2.6",
+                "provider": "custom",
+                "status": "interrupted",
+                "estimated": false,
+                "duration_seconds": 18.93738837500132,
+                "ttft_seconds": 7.723982875002548,
+                "generation_seconds": 11.2129009579985,
+                "tokens_per_second": 47.53453205343752,
+                "cache_hit_rate": 0.8317558977256675
+              },
+              {
+                "call_id": "e957dff4c0a7405793222469f1f4ff63",
+                "prompt_tokens": 1599,
+                "completion_tokens": 532,
+                "total_tokens": 2131,
+                "model": "spark-x2.6",
+                "provider": "custom",
+                "status": "interrupted",
+                "estimated": false,
+                "duration_seconds": 16.197158541002864,
+                "ttft_seconds": 1.610294916001294,
+                "generation_seconds": 14.58626454199839,
+                "tokens_per_second": 36.47266909688952,
+                "cache_hit_rate": null
+              },
+              {
+                "call_id": "9582990907e7413b8d4c3c03ebaaec2f",
+                "prompt_tokens": 6658,
+                "completion_tokens": 483,
+                "total_tokens": 7141,
+                "cache_read_input_tokens": 2752,
+                "model": "spark-x2.6",
+                "provider": "custom",
+                "status": "interrupted",
+                "estimated": false,
+                "duration_seconds": 16.607596541998646,
+                "ttft_seconds": 2.202672999999777,
+                "generation_seconds": 14.404538750000938,
+                "tokens_per_second": 33.53109796729649,
+                "cache_hit_rate": 0.41333733854010213
+              },
+              {
+                "call_id": "e69dd737757a4efd8534c70e34ccfae1",
+                "prompt_tokens": 556,
+                "completion_tokens": 1401,
+                "total_tokens": 1957,
+                "model": "spark-x2.6",
+                "provider": "custom",
+                "status": "interrupted",
+                "estimated": false,
+                "duration_seconds": 41.5630717080021,
+                "ttft_seconds": 11.7392869159994,
+                "generation_seconds": 29.819701667001937,
+                "tokens_per_second": 46.982361381245035,
+                "cache_hit_rate": null
+              }
+            ]
+          }
+        }
+      },
+      "artifacts": [],
+      "needs_input": null,
+      "error": null
+    },
+    "error": null
+  }
+}

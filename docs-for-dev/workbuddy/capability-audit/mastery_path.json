@@ -1,0 +1,103 @@
+{
+  "capability": "mastery_path",
+  "status": "succeeded",
+  "elapsed_seconds": 26.559,
+  "placeholder_detected": false,
+  "submit": {
+    "ok": true,
+    "data": {
+      "job_id": "job_67456d132c904a4e98eec263004618fa",
+      "session_id": "sess_603940d046b9480d8b115b5bbc8ba162",
+      "status": "running",
+      "poll_after_ms": 1000,
+      "billing": {
+        "meter": "mastery",
+        "charged_on": "job_succeeded",
+        "idempotency": "same idempotency_key never charges twice"
+      }
+    },
+    "error": null
+  },
+  "final": {
+    "ok": true,
+    "data": {
+      "job_id": "job_67456d132c904a4e98eec263004618fa",
+      "session_id": "sess_603940d046b9480d8b115b5bbc8ba162",
+      "status": "succeeded",
+      "source_channel": "first_party",
+      "progress": null,
+      "result": {
+        "response": "已生成掌握路径《立方体体积》，包含 3 个学习阶段。",
+        "path_id": "path_5d5f9fd91f7a49ba",
+        "path": {
+          "goal": "立方体体积",
+          "topic": "立方体体积",
+          "description": "面向初中生的立方体体积掌握路径：先理解棱长与立方体结构，再掌握公式 V=a³，最后进行简单应用与单位换算。",
+          "emoji": "🎯",
+          "status": "active",
+          "language": "zh",
+          "objectives": [
+            {
+              "id": "obj-1",
+              "title": "理解棱长与立方体结构",
+              "type": "CONCEPT",
+              "description": "认识立方体的棱、面、顶点，明确“棱长a”的含义与标注；能用直尺测量边长并说明单位（cm、m等）；能比较不同立方体大小并说明“体积”是三维占据的大小。判断掌握：能正确测量并读出棱长与单位，口头解释棱长与体积的关系。",
+              "estimated_minutes": 15,
+              "status": "pending"
+            },
+            {
+              "id": "obj-2",
+              "title": "掌握 V=a³ 公式",
+              "type": "PROCEDURE",
+              "description": "从“体积=长×宽×高”推导立方体体积 V=a×a×a=a³；进行带不同单位（cm、m、dm）的代入计算并能写出正确的体积单位（cm³、m³等）；解释 a³ 表示三层每层 a² 的叠加。判断掌握：随机抽3题代入计算全部正确，并能口述公式来源。",
+              "estimated_minutes": 20,
+              "status": "pending"
+            },
+            {
+              "id": "obj-3",
+              "title": "简单应用与单位换算",
+              "type": "PROCEDURE",
+              "description": "解决三类基础应用：1) 已知棱长求体积（如 a=5cm，V=？）；2) 已知体积求棱长（如 V=64m³，a=？）；3) 单位换算与比较（如 1m³=1000dm³，1dm³=1000cm³，比较大小或填充问题：给体积求层数/块数）。判断掌握：在限定5题内正确率≥4/5，并能说明换算关系。",
+              "estimated_minutes": 25,
+              "status": "pending"
+            }
+          ],
+          "source": "deeptutor_mcp_mastery_path_generate",
+          "book_id": "path_5d5f9fd91f7a49ba",
+          "path_id": "path_5d5f9fd91f7a49ba"
+        },
+        "objectives": [
+          {
+            "id": "obj-1",
+            "title": "理解棱长与立方体结构",
+            "type": "CONCEPT",
+            "description": "认识立方体的棱、面、顶点，明确“棱长a”的含义与标注；能用直尺测量边长并说明单位（cm、m等）；能比较不同立方体大小并说明“体积”是三维占据的大小。判断掌握：能正确测量并读出棱长与单位，口头解释棱长与体积的关系。",
+            "estimated_minutes": 15,
+            "status": "pending"
+          },
+          {
+            "id": "obj-2",
+            "title": "掌握 V=a³ 公式",
+            "type": "PROCEDURE",
+            "description": "从“体积=长×宽×高”推导立方体体积 V=a×a×a=a³；进行带不同单位（cm、m、dm）的代入计算并能写出正确的体积单位（cm³、m³等）；解释 a³ 表示三层每层 a² 的叠加。判断掌握：随机抽3题代入计算全部正确，并能口述公式来源。",
+            "estimated_minutes": 20,
+            "status": "pending"
+          },
+          {
+            "id": "obj-3",
+            "title": "简单应用与单位换算",
+            "type": "PROCEDURE",
+            "description": "解决三类基础应用：1) 已知棱长求体积（如 a=5cm，V=？）；2) 已知体积求棱长（如 V=64m³，a=？）；3) 单位换算与比较（如 1m³=1000dm³，1dm³=1000cm³，比较大小或填充问题：给体积求层数/块数）。判断掌握：在限定5题内正确率≥4/5，并能说明换算关系。",
+            "estimated_minutes": 25,
+            "status": "pending"
+          }
+        ],
+        "generation_mode": "deeptutor_llm_postgres"
+      },
+      "artifacts": [],
+      "needs_input": null,
+      "error": null
+    },
+    "error": null
+  }
+}
