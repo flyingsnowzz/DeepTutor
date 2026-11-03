@@ -42,3 +42,16 @@ def test_structured_scene_can_omit_title():
     assert "title = Text" not in generated.code
     assert "previous = None" in generated.code
     assert "V = a³" in generated.code
+
+
+def test_structured_scene_splits_chinese_yu_into_two_formula_lines():
+    generated = structured_manim_code(
+        user_input="不显示标题，只显示 V = a³ 与 3³ = 27，约 5 秒。",
+        analysis=ConceptAnalysis(),
+        design=SceneDesign(title=""),
+    )
+
+    assert generated.code.count("line = Text(") == 2
+    assert 'line = Text("V = a³"' in generated.code
+    assert 'line = Text("3³ = 27"' in generated.code
+    assert "V = a³ 与" not in generated.code

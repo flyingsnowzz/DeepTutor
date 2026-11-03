@@ -34,7 +34,7 @@ def _clean(value: Any, *, limit: int = 90) -> str:
 
 def _teaching_lines(user_input: str, analysis: Any, design: Any) -> tuple[str, list[str]]:
     formulas = []
-    clauses = re.split(r"(?:，|,|。|；|;|\band\b|和|以及)", user_input, flags=re.IGNORECASE)
+    clauses = re.split(r"(?:，|,|。|；|;|\band\b|和|与|以及)", user_input, flags=re.IGNORECASE)
     for clause in clauses:
         for match in _MATH_LINE.finditer(clause):
             line = _clean(match.group(0))
