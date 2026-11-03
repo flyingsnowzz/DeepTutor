@@ -10,6 +10,7 @@ from deeptutor.agents.math_animator.request_config import (
 def test_validate_math_animator_request_config_defaults() -> None:
     config = validate_math_animator_request_config(None)
     assert config.output_mode == "video"
+    assert config.generation_mode == "freeform"
     assert config.quality == "medium"
     assert config.style_hint == ""
 

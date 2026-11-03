@@ -94,12 +94,12 @@
         "status": "ready",
         "supports_jobs": true,
         "missing_dependencies": [],
-        "estimated_duration_sec": 300,
+        "estimated_duration_sec": 120,
         "cost_hint": {
           "meter": "media",
           "billed_event": "job_succeeded",
           "media": true,
-          "notice": "渲染耗时约 2–8 分钟，按 TTS/模型用量计费"
+          "notice": "结构化视频课通常约 30 秒–数分钟，按 TTS/模型用量计费；成功产物为可浏览器播放的课程 ZIP"
         }
       },
       {

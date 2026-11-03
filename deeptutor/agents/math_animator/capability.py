@@ -83,12 +83,24 @@ class MathAnimatorCapability(TurnCapability):
 
         stage_start = time.perf_counter()
         async with stream.stage("code_generation", source=self.name):
-            generated = await pipeline.run_code_generation(
-                user_input=context.user_message,
-                request_config=request_config,
-                analysis=analysis,
-                design=design,
-            )
+            generation_mode = request_config.generation_mode
+            if generation_mode == "storyboard":
+                generated = pipeline.run_structured_code_generation(
+                    user_input=context.user_message, analysis=analysis, design=design
+                )
+            else:
+                try:
+                    generated = await pipeline.run_code_generation(
+                        user_input=context.user_message,
+                        request_config=request_config,
+                        analysis=analysis,
+                        design=design,
+                    )
+                except Exception:
+                    generation_mode = "storyboard_fallback"
+                    generated = pipeline.run_structured_code_generation(
+                        user_input=context.user_message, analysis=analysis, design=design
+                    )
             await stream.progress(
                 message=i18n.t("code_prepared", "Manim code prepared."),
                 source=self.name,
@@ -141,15 +153,32 @@ class MathAnimatorCapability(TurnCapability):
                 stage="code_retry",
                 metadata={**render_call_meta, "call_state": "running"},
             )
-            final_code, render_result = await pipeline.run_render(
-                turn_id=turn_id,
-                user_input=context.user_message,
-                request_config=request_config,
-                initial_code=generated.code,
-                on_retry=_on_retry,
-                on_render_progress=_on_render_progress,
-                on_retry_status=_on_retry_status,
-            )
+            try:
+                final_code, render_result = await pipeline.run_render(
+                    turn_id=turn_id,
+                    user_input=context.user_message,
+                    request_config=request_config,
+                    initial_code=generated.code,
+                    on_retry=_on_retry,
+                    on_render_progress=_on_render_progress,
+                    on_retry_status=_on_retry_status,
+                )
+            except Exception:
+                if generation_mode.startswith("storyboard"):
+                    raise
+                generation_mode = "storyboard_fallback"
+                generated = pipeline.run_structured_code_generation(
+                    user_input=context.user_message, analysis=analysis, design=design
+                )
+                final_code, render_result = await pipeline.run_render(
+                    turn_id=turn_id,
+                    user_input=context.user_message,
+                    request_config=request_config,
+                    initial_code=generated.code,
+                    on_retry=_on_retry,
+                    on_render_progress=_on_render_progress,
+                    on_retry_status=_on_retry_status,
+                )
         timings["code_retry"] = round(time.perf_counter() - stage_start, 3)
 
         stage_start = time.perf_counter()
@@ -206,6 +235,7 @@ class MathAnimatorCapability(TurnCapability):
                 "timings": timings,
                 "render": {
                     "quality": request_config.quality,
+                    "generation_mode": generation_mode,
                     "retry_attempts": render_result.retry_attempts,
                     "retry_history": [item.model_dump() for item in render_result.retry_history],
                     "source_code_path": render_result.source_code_path,

@@ -13,6 +13,7 @@ class MathAnimatorRequestConfig(BaseModel):
     output_mode: Literal["video", "image"] = "video"
     quality: Literal["low", "medium", "high"] = "medium"
     style_hint: str = Field(default="", max_length=500)
+    generation_mode: Literal["freeform", "storyboard"] = "freeform"
 
 
 def validate_math_animator_request_config(

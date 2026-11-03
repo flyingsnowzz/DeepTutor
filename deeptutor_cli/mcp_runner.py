@@ -122,6 +122,8 @@ class TurnCapabilityRunner:
             )
         if capability == "video_lesson":
             config = {"generation_mode": "storyboard", **config}
+        if capability == "math_animator":
+            config = {"generation_mode": "storyboard", **config}
         request = TurnRequest(
             content=str(payload.get("prompt", "")),
             capability=capability,

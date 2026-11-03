@@ -143,6 +143,11 @@ class MathAnimatorPipeline:
             duration_target_seconds=duration_target_seconds,
         )
 
+    def run_structured_code_generation(self, *, user_input: str, analysis, design):
+        from .structured_scene import structured_manim_code
+
+        return structured_manim_code(user_input=user_input, analysis=analysis, design=design)
+
     async def run_render(
         self,
         *,

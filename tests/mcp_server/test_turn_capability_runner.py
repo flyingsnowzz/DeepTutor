@@ -207,6 +207,7 @@ async def test_math_artifacts_are_collected_from_turn_workspace(monkeypatch, tmp
 
     assert outcome.artifacts[0]["data"] == b"real-video"
     assert outcome.artifacts[0]["mime_type"] == "video/mp4"
+    assert app.requests[0].config["generation_mode"] == "storyboard"
 
 
 @pytest.mark.asyncio
