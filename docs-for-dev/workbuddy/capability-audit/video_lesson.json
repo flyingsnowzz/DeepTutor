@@ -1,7 +1,9 @@
 {
   "capability": "video_lesson",
-  "job_id": "job_af5823ea8af64260bdae21e50bc4e89b",
-  "status": "canceled",
-  "error": "{\"code\": \"JOB_CANCELED\", \"message\": \"Job canceled\", \"retryable\": false}",
-  "input": "{\"prompt\": \"生成约 20 秒的立方体体积视频课，解释 V=a³ 和棱长 3 体积 27。\"}"
+  "job_id": "job_382074112a634111bd068f462141a320",
+  "status": "failed",
+  "error": "{\"code\": \"JOB_FAILED\", \"message\": \"\", \"retryable\": false}",
+  "input": "{\"prompt\": \"生成约 8 秒、只有 2 个简洁场景的立方体体积视频课，展示 V=a³ 和 3³=27。\"}",
+  "created_at": "2026-11-03 04:27:08.491180+00:00",
+  "finished_at": "2026-11-03 04:42:08.510263+00:00"
 }

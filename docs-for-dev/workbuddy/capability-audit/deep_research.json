@@ -1,7 +1,9 @@
 {
   "capability": "deep_research",
-  "job_id": "job_b57f62efceaf499fba2d3f6e961c9998",
+  "job_id": "job_40d41eb8ea364d729b8951ff355c77f8",
   "status": "canceled",
-  "error": "{\"code\": \"JOB_CANCELED\", \"message\": \"Job canceled\", \"retryable\": false}",
-  "input": "{\"prompt\": \"用快速研究模式，简要说明立方体体积公式 V=a³ 的含义，给出两点教学要点。\", \"config\": {\"mode\": \"notes\", \"depth\": \"quick\"}}"
+  "error": "{\"code\": \"JOB_CANCELED\", \"message\": \"deep_research exceeded the 20 minute reporting budget without new events\", \"retryable\": false}",
+  "input": "{\"mode\": \"quick\", \"prompt\": \"请采用快速研究模式，围绕「立方体（正方体）体积公式 V = a³」做一份面向中小学数学教学的完整研究/教学要点报告。严格要求：不要只给大纲或要点列表，必须输出完整、展开的论述内容（每个部分都要有具体说明和例子）。报告请涵盖：1）概念定义与公式来源（体积、棱长、立方运算的含义）；2）公式推导过程（V = 长×宽×高 = a×a×a = a³）；3）与长方体体积 V = abc 的关系与区别；4）单位与量纲（立方厘米等立方单位、体积单位与面积单位的混淆）；5）典型易错点（误用 a²、误算 a×3、混淆体积与表面积、忽略立方单位）；6）教学建议与引入情境（积木、水箱、骰子等）；7）常见例题与变式（已知棱长求体积、已知体积反求棱长、单位换算、生活应用题）；8）与后续知识的衔接（平方根/立方根、幂的运算、开方）。全文用中文、结构化呈现、配有具体数值例子。\"}",
+  "created_at": "2026-11-03 04:26:51.074628+00:00",
+  "finished_at": "2026-11-03 04:51:40.039151+00:00"
 }

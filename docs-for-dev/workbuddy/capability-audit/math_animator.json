@@ -1,7 +1,9 @@
 {
   "capability": "math_animator",
-  "job_id": "job_1334aa34b64c4866b4fcd6fba395917f",
-  "status": "canceled",
-  "error": "{\"code\": \"JOB_CANCELED\", \"message\": \"Job canceled\", \"retryable\": false}",
-  "input": "{\"prompt\": \"生成约 10 秒数学动画，展示棱长为 a 的立方体由 a×a×a 个单位小立方体组成。\"}"
+  "job_id": "job_1ff854613545407199c6d99269dd7c7a",
+  "status": "failed",
+  "error": "{\"code\": \"JOB_FAILED\", \"message\": \"Capability run failed\", \"retryable\": false}",
+  "input": "{\"prompt\": \"生成约 5 秒、只有一个简洁场景的数学动画，显示 V=a³ 和 3³=27，不要复杂几何体。\"}",
+  "created_at": "2026-11-03 04:35:26.351688+00:00",
+  "finished_at": "2026-11-03 04:47:13.393058+00:00"
 }
