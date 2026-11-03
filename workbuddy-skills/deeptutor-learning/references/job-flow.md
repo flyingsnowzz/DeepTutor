@@ -18,6 +18,7 @@ submit ──▶ queued/running ──轮询──▶ succeeded / failed / cance
 4. `succeeded`：
    - 从 `artifacts[]` 取 `artifact_ref`，调 `artifact_get` 拿 900 秒短期 URL 再展示/播放；
    - 有 `result` 文本时按 output-style 组织讲解。
+   - 深度研究若 `result.response` 带 `…[truncated]`，不得把预览当完整报告：必须取 `kind=research_report` 的 `research-report.md` 产物，读取全文与文末参考资料后再验收。
 5. `failed`：用 `error.code/message` 转人话（见 troubleshooting），可建议修正参数后**用新的 idempotency_key** 重试；系统错误（retryable）可原样重试一次。
 6. `canceled`：说明任务已取消；用户改主意时调 `capability_job_cancel`。
 7. `needs_input`：用 `capability_job_reply` 补充信息后继续，**不要**重新 submit。
@@ -33,7 +34,7 @@ submit ──▶ queued/running ──轮询──▶ succeeded / failed / cance
 
 | 作业 | 预计耗时 | 成功产物 |
 | --- | --- | --- |
-| deep_research | 约 2–8 分钟 | 研究报告文本；附加知识库时包含引用 |
+| deep_research | 约 2–8 分钟 | 报告预览 + `research-report.md` 完整报告产物；附加知识库时包含引用 |
 | visualize | 约 10–30 秒 | Mermaid/文本 artifact |
 | deep_question | 约 20–40 秒 | 题目；生产环境会写入练习库 |
 | problem_solve | 约 30–60 秒 | 分步解答+同类练习 |

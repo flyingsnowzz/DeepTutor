@@ -90,7 +90,7 @@ async def test_headless_quick_research_starts_with_one_confirmed_topic(monkeypat
     app = FakeApp([[result_event({"response": "full research report"}), done_event()]])
     monkeypatch.setattr("deeptutor.app.DeepTutorApp", lambda: app)
 
-    await TurnCapabilityRunner().run(
+    outcome = await TurnCapabilityRunner().run(
         capability="deep_research", payload={"prompt": "research cube volume"}
     )
 
@@ -99,6 +99,9 @@ async def test_headless_quick_research_starts_with_one_confirmed_topic(monkeypat
     assert app.requests[0].config["confirmed_outline"] == [
         {"title": "research cube volume"}
     ]
+    assert outcome.artifacts[0]["kind"] == "research_report"
+    assert outcome.artifacts[0]["mime_type"] == "text/markdown"
+    assert outcome.artifacts[0]["data"] == b"full research report"
 
 
 @pytest.mark.asyncio

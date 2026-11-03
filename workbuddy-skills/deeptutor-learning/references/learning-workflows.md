@@ -29,7 +29,12 @@
 5. 阶段性总结：`practice_summary_get`（含错题/待复习数与额度），掌握度看 `mastery_map_get`。
 6. 同一 request_id 重试返回首次结果，不重复计分。示例见 `examples/quiz-practice.md`。
 
-## 4. 媒体讲解（可视化/音频/视频/动画）
+## 4. 深度研究完整报告
+
+- `deep_research` 成功返回的 `result.response` 可能因 MCP 输出上限只是预览；完整报告固定通过 `kind=research_report`、`filename=research-report.md` 的产物交付。
+- 验收时必须 `artifact_get` 获取并读取该 Markdown 全文，检查结论和文末 `<details id="references">` 参考资料。不得只展示截断预览，也不得改为读取服务数据库或让宿主补写缺失部分。
+
+## 5. 媒体讲解（可视化/音频/视频/动画）
 
 1. 先 `capabilities_list`：
    - video/math 显示 `missing_dependency` 时明确告知服务端暂不可用，不要承诺；

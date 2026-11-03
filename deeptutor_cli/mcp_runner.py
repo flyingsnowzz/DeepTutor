@@ -242,6 +242,18 @@ class TurnCapabilityRunner:
         session: dict,
         turn: dict,
     ):
+        if capability == "deep_research":
+            report = str(result.get("response") or "").strip()
+            if report:
+                yield {
+                    "key_suffix": "research-report.md",
+                    "data": report.encode("utf-8"),
+                    "kind": "research_report",
+                    "mime_type": "text/markdown",
+                    "filename": "research-report.md",
+                }
+            return
+
         if capability == "visualize":
             payload = result.get("payload") or {}
             data = payload.get("data")
