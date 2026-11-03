@@ -62,21 +62,33 @@ def structured_manim_code(*, user_input: str, analysis: Any, design: Any) -> Gen
     intro_seconds = 0.6
     line_seconds = 0.65
     final_wait = max(0.8, duration - intro_seconds - len(lines) * line_seconds)
+    show_title = not re.search(r"不显示标题|不要标题|无标题|no title", user_input, re.IGNORECASE)
     body = [
         "from manim import Scene, Text, Write, FadeIn, UP, DOWN",
         "",
         "class StructuredMathScene(Scene):",
         "    def construct(self):",
-        f"        title = Text({json.dumps(title, ensure_ascii=False)}, font_size=40)",
-        "        title.to_edge(UP, buff=0.65)",
-        f"        self.play(Write(title), run_time={intro_seconds})",
-        "        previous = title",
     ]
-    for line in lines:
+    if show_title:
+        body.extend(
+            [
+                f"        title = Text({json.dumps(title, ensure_ascii=False)}, font_size=40)",
+                "        title.to_edge(UP, buff=0.65)",
+                f"        self.play(Write(title), run_time={intro_seconds})",
+                "        previous = title",
+            ]
+        )
+    else:
+        body.append("        previous = None")
+    for index, line in enumerate(lines):
         body.extend(
             [
                 f"        line = Text({json.dumps(line, ensure_ascii=False)}, font_size=34)",
-                "        line.next_to(previous, DOWN, buff=0.65)",
+                (
+                    "        line.next_to(previous, DOWN, buff=0.65)"
+                    if index or show_title
+                    else "        line.to_edge(UP, buff=0.65)"
+                ),
                 f"        self.play(FadeIn(line, shift=DOWN * 0.2), run_time={line_seconds})",
                 "        previous = line",
             ]

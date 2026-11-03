@@ -29,3 +29,16 @@ def test_structured_scene_does_not_leak_prompt_instructions_and_meets_duration()
     assert "3³ = 27" in generated.code
     # 0.6 intro + 2 × 0.65 formula reveals + 3.1 final hold = 5 seconds.
     assert "self.wait(3.100)" in generated.code
+
+
+def test_structured_scene_can_omit_title():
+    generated = structured_manim_code(
+        user_input="不显示标题，约 5 秒，只显示 V = a^3 和 3^3 = 27。",
+        analysis=ConceptAnalysis(),
+        design=SceneDesign(title="不应出现的标题"),
+    )
+
+    assert "不应出现的标题" not in generated.code
+    assert "title = Text" not in generated.code
+    assert "previous = None" in generated.code
+    assert "V = a³" in generated.code
