@@ -138,6 +138,8 @@ WorkBuddy 重启后已确认实际进程为 `DEEPTUTOR_MCP_DETERMINISTIC=0`。�
 visualize 请求由 DeepTutor 返回正确 Mermaid，并在客户端展示，证据：
 [`capability-audit/workbuddy-visualize-real.png`](./capability-audit/workbuddy-visualize-real.png)。
 较复杂请求曾发生模型停滞，因此同时增加服务端能力超时和结果有效性校验。
+真实 `quiz_generate_submit` 也已在 WorkBuddy 中返回完整选择题和解析，证据：
+[`capability-audit/workbuddy-quiz-real.png`](./capability-audit/workbuddy-quiz-real.png)。
 
 ## 7. 当前仍需外部条件完成的事项
 

@@ -42,4 +42,6 @@
 
 证据：`workbuddy-visualize-real.png`。这既证明真实链路可用，也说明请求复杂度和模型稳定性必须纳入生产验收，不能把取消或宿主兜底算作成功。
 
+随后又在 WorkBuddy 中调用 `quiz_generate_submit` 生成 1 道立方体体积四选一题。DeepTutor 用时约 3 分钟返回完整题干、A-D 选项、正确答案 D（216）及解析，客户端明确显示“这是 DeepTutor 出的，不是我编的”。证据：`workbuddy-quiz-real.png`。
+
 本目录的 JSON 是实际调用记录，不用“工具注册成功”冒充“能力产出成功”。
