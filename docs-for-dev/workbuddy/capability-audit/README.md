@@ -14,10 +14,10 @@
 | `immersive_reading` | ✅ 通过 | 实际 LLM 精读回答，带章节引用 |
 | `visualize` | ✅ WorkBuddy 通过 | 正确的立方体体积 Mermaid，包含 `a³` 和 `3³=27` |
 | `mastery_path` | ✅ 通过 | 生成 3 个学习阶段并持久化到 PostgreSQL，返回 `path_id` |
-| `deep_research` | ✅ 直接 MCP 通过，⏳ WorkBuddy 待复验 | 基于附件知识库强制 RAG，返回 6,631 字完整报告，1 条引用，`partial=false` |
+| `deep_research` | ✅ 直接 MCP 复检通过，⏳ WorkBuddy 待复验 | 新 job 基于附件知识库强制 RAG，255.3 秒返回 6,385 字完整报告，1 条引用，`partial=false` |
 | `audio_overview` | ✅ WorkBuddy 通过 | 离线 macOS `say` + ffmpeg 生成真实 MP3 和逐字稿；最近一次约 50 秒、532 KB |
-| `video_lesson` | ✅ 直接 MCP 通过，⏳ WorkBuddy 待复验 | 结构化分镜 + 受控 Remotion，约 27 秒完成；ZIP 为 247,689 字节，内含 676,573 字节课程 HTML |
-| `math_animator` | ✅ 直接 MCP 通过，⏳ WorkBuddy 待复验 | 真实 Manim MP4，150,611 字节，已验证 MP4 `ftyp` 头 |
+| `video_lesson` | ✅ 直接 MCP 复检通过，⏳ WorkBuddy 待复验 | 新 job 使用结构化分镜 + 受控 Remotion，50.3 秒完成；ZIP 为 274,627 字节，内含 718,652 字节课程 HTML，`unzip -t` 通过 |
+| `math_animator` | ✅ 直接 MCP 复检通过，⏳ WorkBuddy 待复验 | 新 job 真实 Manim MP4，659.0 秒完成；79,840 字节，ffprobe 显示 5.000 秒、MP4 容器有效；中途一次 LLM 断连已由重试恢复 |
 
 ## 根因与已修复项
 
@@ -39,6 +39,13 @@
 - 数学动画通过 `artifact_get` 获取短期链接后下载 150,611 字节，文件头包含 MP4 `ftyp`。
 - 视频课通过 `artifact_get` 下载 `lesson.zip`（247,689 字节），ZIP 内包含 `lesson.html`（676,573 字节）。
 - 音频已通过 ffprobe 和 WorkBuddy 端到端展示验证。
+
+### 2026-11-03 16:10 复检
+
+- 三项均使用新的 job id，不复用旧成功记录。
+- 深度研究：255.3 秒，6,385 字，1 条正文编号引用，`partial=false`、`degraded=false`。
+- 视频课：50.3 秒，下载 `lesson.zip` 274,627 字节，内含 `lesson.html` 718,652 字节，压缩包完整性测试通过。
+- 数学动画：659.0 秒，下载 MP4 79,840 字节，`ffprobe` 验证为 5.000 秒 MP4。一次大模型 `incomplete chunked read` 被内置重试恢复，最终任务成功。
 
 ## 后续
 

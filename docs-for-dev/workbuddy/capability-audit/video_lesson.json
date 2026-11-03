@@ -1,13 +1,28 @@
 {
   "capability": "video_lesson",
   "status": "succeeded",
-  "elapsed_seconds": 27.372,
+  "elapsed_seconds": 50.299,
+  "recheck": true,
   "placeholder_detected": false,
+  "artifact_checks": [
+    {
+      "artifact_ref": "art_71945c1104b74a9e94009b741c98dcd9",
+      "mime_type": "application/zip",
+      "filename": "lesson.zip",
+      "downloaded_bytes": 274627,
+      "url_expires_in_sec": 900,
+      "zip_entries": [
+        "lesson.html"
+      ],
+      "html_filename": "lesson.html",
+      "html_bytes": 718652
+    }
+  ],
   "submit": {
     "ok": true,
     "data": {
-      "job_id": "job_76051b6a694742a8abb28a284c66eda9",
-      "session_id": "sess_a6defe935e54461eb9acfe4ed10d5d6d",
+      "job_id": "job_27f3731fc76e4f9a9d9024108391f46a",
+      "session_id": "sess_dc759b6b479d4841ad2d289a50f48611",
       "status": "running",
       "poll_after_ms": 1000,
       "billing": {
@@ -21,30 +36,30 @@
   "final": {
     "ok": true,
     "data": {
-      "job_id": "job_76051b6a694742a8abb28a284c66eda9",
-      "session_id": "sess_a6defe935e54461eb9acfe4ed10d5d6d",
+      "job_id": "job_27f3731fc76e4f9a9d9024108391f46a",
+      "session_id": "sess_dc759b6b479d4841ad2d289a50f48611",
       "status": "succeeded",
       "source_channel": "first_party",
       "progress": null,
       "result": {
-        "response": "用两个简洁场景说明立方体体积公式 V=a³，并演示 a=3 时的计算 3³=27。",
-        "title": "立方体体积公式 V=a³（8秒速览）",
+        "response": "用极简两幕理解立方体体积：先认识公式 V=a³，再代入边长 3 计算 3³=27。",
+        "title": "立方体体积：V=a³（8秒速览）",
         "artifacts": [
           {
             "type": "html",
-            "url": "/files/outputs/workspace/chat/video_lesson/turn_1793686653444_d0c1c7dfa9/artifacts/lesson.html",
+            "url": "/files/outputs/workspace/chat/video_lesson/turn_1793692526968_2b6a296414/artifacts/lesson.html",
             "filename": "lesson.html",
             "content_type": "text/html",
-            "label": "立方体体积公式 V=a³（8秒速览）"
+            "label": "立方体体积：V=a³（8秒速览）"
           }
         ],
         "code": {
           "language": "tsx",
-          "content": "import React from 'react';\nimport {Stage, Title, Body, Card, Formula, Scenes, lessonLength} from './kit';\n\nconst scenes = [\n{voice: \"scene-1\", frames: 150, content: (<Stage eyebrow={\"立方体体积公式 V=a³（8秒速览）\"}><Title x={120} y={150} w={1500} size={72}>{\"认识立方体体积\"}</Title><Body x={120} y={300} w={1200} size={38}><p>\"立方体：长=宽=高=边长 a\"</p><p>\"体积=底面积×高=a²×a\"</p><p>\"公式：V=a³\"</p></Body><Card x={120} y={560} w={900} title={\"核心公式\"}><Formula>{\"V = a^3\"}</Formula></Card></Stage>)},\n{voice: \"scene-2\", frames: 150, content: (<Stage eyebrow={\"立方体体积公式 V=a³（8秒速览）\"}><Title x={120} y={150} w={1500} size={72}>{\"例题：a=3 时\"}</Title><Body x={120} y={300} w={1200} size={38}><p>\"代入：V=3³\"</p><p>\"计算：3×3×3=27\"</p><p>\"结论：V=27\"</p></Body><Card x={120} y={560} w={900} title={\"核心公式\"}><Formula>{\"V = 3^3 = 27\"}</Formula></Card></Stage>)},\n];\n\nexport const LESSON = {durationInFrames: lessonLength(scenes), fps: 30, width: 1920, height: 1080};\n\nexport function Lesson() {\n  return <Scenes scenes={scenes} />;\n}\n"
+          "content": "import React from 'react';\nimport {Stage, Title, Body, Card, Formula, Scenes, lessonLength} from './kit';\n\nconst scenes = [\n{voice: \"scene-1\", frames: 150, content: (<Stage eyebrow={\"立方体体积：V=a³（8秒速览）\"}><Title x={120} y={150} w={1500} size={72}>{\"认识立方体体积\"}</Title><Body x={120} y={300} w={1200} size={38}><p>\"立方体的长、宽、高都等于边长 a\"</p><p>\"体积 = 长×宽×高 = a×a×a\"</p><p>\"公式：V = a³\"</p></Body><Card x={120} y={560} w={900} title={\"核心公式\"}><Formula>{\"V = a^3\"}</Formula></Card></Stage>)},\n{voice: \"scene-2\", frames: 150, content: (<Stage eyebrow={\"立方体体积：V=a³（8秒速览）\"}><Title x={120} y={150} w={1500} size={72}>{\"代入 a=3 计算\"}</Title><Body x={120} y={300} w={1200} size={38}><p>\"取边长 a = 3\"</p><p>\"则 V = 3³ = 3×3×3 = 27\"</p><p>\"单位随边长，如 3 cm 对应 27 cm³\"</p></Body><Card x={120} y={560} w={900} title={\"核心公式\"}><Formula>{\"V = 3^3 = 27\"}</Formula></Card></Stage>)},\n];\n\nexport const LESSON = {durationInFrames: lessonLength(scenes), fps: 30, width: 1920, height: 1080};\n\nexport function Lesson() {\n  return <Scenes scenes={scenes} />;\n}\n"
         },
         "render": {
           "attempts": [],
-          "duration_seconds": 13,
+          "duration_seconds": 18,
           "narrated": true
         },
         "timings": {
@@ -54,38 +69,37 @@
         "metadata": {
           "usage_summary": {
             "prompt_tokens": 176,
-            "completion_tokens": 466,
-            "total_tokens": 642,
-            "cache_read_input_tokens": 128,
+            "completion_tokens": 476,
+            "total_tokens": 652,
+            "cache_read_input_tokens": 0,
             "cache_creation_input_tokens": 0,
             "reasoning_tokens": 0,
-            "duration_seconds": 17.39347283400275,
+            "duration_seconds": 21.426777000000584,
             "total_calls": 1,
-            "cache_reported_calls": 1,
-            "cache_input_tokens": 176,
-            "cache_hit_rate": 0.7272727272727273,
-            "ttft_seconds": 3.2913173750057467,
+            "cache_reported_calls": 0,
+            "cache_input_tokens": 0,
+            "cache_hit_rate": null,
+            "ttft_seconds": 7.357204167004966,
             "ttft_calls": 1,
-            "generation_seconds": 14.095827041994198,
-            "timed_completion_tokens": 466,
-            "tokens_per_second": 33.059429475950274,
+            "generation_seconds": 14.065434582997113,
+            "timed_completion_tokens": 476,
+            "tokens_per_second": 33.84182672716055,
             "estimated_calls": 0,
             "call_details": [
               {
-                "call_id": "1d7bc4e6d12d4a089e5042fe2e0244fb",
+                "call_id": "fb97af81de80433b91128095ec99068f",
                 "prompt_tokens": 176,
-                "completion_tokens": 466,
-                "total_tokens": 642,
-                "cache_read_input_tokens": 128,
+                "completion_tokens": 476,
+                "total_tokens": 652,
                 "model": "spark-x2.6",
                 "provider": "OpenAICompatProvider",
                 "status": "completed",
                 "estimated": false,
-                "duration_seconds": 17.39347283400275,
-                "ttft_seconds": 3.2913173750057467,
-                "generation_seconds": 14.095827041994198,
-                "tokens_per_second": 33.059429475950274,
-                "cache_hit_rate": 0.7272727272727273
+                "duration_seconds": 21.426777000000584,
+                "ttft_seconds": 7.357204167004966,
+                "generation_seconds": 14.065434582997113,
+                "tokens_per_second": 33.84182672716055,
+                "cache_hit_rate": null
               }
             ]
           }
@@ -93,7 +107,7 @@
       },
       "artifacts": [
         {
-          "artifact_ref": "art_a977dc8714f04e4694a822f8e1d1b64f",
+          "artifact_ref": "art_71945c1104b74a9e94009b741c98dcd9",
           "kind": "video_lesson",
           "mime_type": "application/zip",
           "title": "lesson.zip"
