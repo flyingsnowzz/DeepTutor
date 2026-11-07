@@ -31,6 +31,8 @@ The default admin scope uses this layout:
 | `data/users/<user-id>/` | Per-user workspace roots when local multi-user auth is enabled |
 | `data/partners/<partner-id>/` | Synthetic Partner workspaces |
 | `data/system/` | Accounts, grants, audit records, indexes, and owner credentials |
+| `data/system/auth/users.json` | Ordinary local user accounts |
+| `data/system/auth/admins.json` | Administrators created by the deployment super administrator |
 
 A selected Content Workspace can be outside `data/user`. In that case its
 private learning state is under `<workspace>/.deeptutor/data/`, while account

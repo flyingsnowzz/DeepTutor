@@ -215,6 +215,22 @@ def learner_grant(user_id: str) -> dict[str, Any]:
 
 
 def load_grant(user_id: str) -> dict[str, Any]:
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        from .postgres_grants import load
+
+        stored = load(user_id)
+        if stored is None:
+            return empty_grant(user_id)
+        if not isinstance(stored, dict):
+            raise GrantStorageError(f"Grant for user {user_id} must be a JSON object")
+        grant = normalize_grant(user_id, stored)
+        try:
+            validate_grant(grant)
+        except ValueError as exc:
+            raise GrantStorageError(f"Grant for user {user_id} is invalid") from exc
+        return grant
     path = grant_path(user_id)
     if not path.exists():
         return empty_grant(user_id)
@@ -269,7 +285,16 @@ def _validated_grant(user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
 
 def _write_grant(
     user_id: str, payload: dict[str, Any], *, with_receipt: bool
-) -> tuple[dict[str, Any], GrantWriteReceipt | None]:
+) -> tuple[dict[str, Any], GrantWriteReceipt | Any | None]:
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        from .postgres_grants import save
+
+        grant = normalize_grant(user_id, payload)
+        validate_grant(grant)
+        receipt = save(user_id, grant)
+        return grant, receipt if with_receipt else None
     grant = _validated_grant(user_id, payload)
     path = grant_path(user_id)
     written_text = json.dumps(grant, indent=2, ensure_ascii=False)
@@ -300,6 +325,14 @@ def save_grant_with_receipt(
 
 def restore_grant_if_unchanged(user_id: str, receipt: GrantWriteReceipt) -> bool:
     """Restore a failed transaction only while its own write is current."""
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        from .postgres_grants import PostgresGrantWriteReceipt, restore_if_unchanged
+
+        if not isinstance(receipt, PostgresGrantWriteReceipt):
+            raise TypeError("Expected a PostgreSQL grant receipt")
+        return restore_if_unchanged(user_id, receipt)
     path = grant_path(user_id)
     with _grant_write_lock(path):
         if not path.exists() or _file_identity(path) != receipt.file_identity:

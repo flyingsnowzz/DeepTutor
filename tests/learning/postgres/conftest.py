@@ -36,8 +36,14 @@ async def engine(database_url):
 
 
 @pytest_asyncio.fixture
-async def accounts(engine) -> AccountService:
-    return AccountService(engine)
+async def accounts(database_url) -> AccountService:
+    from deeptutor.services.postgres.database import authentication_database_url
+
+    account_engine = create_engine(authentication_database_url())
+    try:
+        yield AccountService(account_engine)
+    finally:
+        await account_engine.dispose()
 
 
 @pytest.fixture

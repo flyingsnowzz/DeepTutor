@@ -139,9 +139,11 @@ async def get_learning_index():
         ]
 
     async def practice():
-        from deeptutor.services.session import get_sqlite_session_store
+        from deeptutor.services.session import get_session_store, get_sqlite_session_store
+        from deeptutor.services.storage_backend import storage_backend
 
-        return await get_sqlite_session_store().list_notebook_navigation()
+        store = get_session_store() if storage_backend() == "postgres" else get_sqlite_session_store()
+        return await store.list_notebook_navigation()
 
     result = {}
     failed = []
@@ -239,9 +241,10 @@ async def get_learning_library(kind: str):
                 "materials"
             ]
         if kind == "practice":
-            from deeptutor.services.session import get_sqlite_session_store
+            from deeptutor.services.session import get_session_store, get_sqlite_session_store
+            from deeptutor.services.storage_backend import storage_backend
 
-            store = get_sqlite_session_store()
+            store = get_session_store() if storage_backend() == "postgres" else get_sqlite_session_store()
             items = []
             offset = 0
             while True:

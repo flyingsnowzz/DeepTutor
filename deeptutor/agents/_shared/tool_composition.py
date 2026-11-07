@@ -367,9 +367,11 @@ def user_has_question_bank() -> bool:
     Same fail-closed posture as its siblings.
     """
     try:
-        from deeptutor.services.session import get_sqlite_session_store
+        from deeptutor.services.session import get_session_store, get_sqlite_session_store
+        from deeptutor.services.storage_backend import storage_backend
 
-        return get_sqlite_session_store().has_question_bank_entries()
+        store = get_session_store() if storage_backend() == "postgres" else get_sqlite_session_store()
+        return store.has_question_bank_entries()
     except Exception:
         return False
 

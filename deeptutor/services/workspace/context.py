@@ -65,11 +65,16 @@ def workspace_url(url: str) -> str:
 def resolve_workspace_scope(workspace_id: str | None = None) -> WorkspaceScope:
     from deeptutor.multi_user.paths import get_account_path_service
     from deeptutor.services.workspace import get_content_workspace_service
+    from deeptutor.services.storage_backend import storage_backend
 
     base = get_account_path_service()
+    workspace_id = str(workspace_id or "").strip()
+    if not workspace_id and storage_backend() == "postgres":
+        # The default workspace needs no local catalog lookup. In PostgreSQL
+        # mode this also keeps background reminders off the SQLite catalog.
+        return WorkspaceScope("", base.workspace_root, base.get_workspace_dir())
     service = get_content_workspace_service()
     service.assert_available()
-    workspace_id = str(workspace_id or "").strip()
     if not workspace_id or workspace_id == service._builtin_id("general"):
         return WorkspaceScope("", base.workspace_root, base.get_workspace_dir())
     # Catalog resolution checks owner and kind. A session/system folder is

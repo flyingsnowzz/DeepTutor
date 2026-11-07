@@ -48,7 +48,9 @@ def learner_has_topics() -> bool:
     learner does not see.
     """
     try:
-        if not LearningStore.default_db_path().exists():
+        from deeptutor.services.storage_backend import storage_backend
+
+        if storage_backend() != "postgres" and not LearningStore.default_db_path().exists():
             return False
         return LearningStore().has_active_topics()
     except Exception:

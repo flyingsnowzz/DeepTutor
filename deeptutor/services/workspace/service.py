@@ -775,7 +775,18 @@ class ContentWorkspaceService(WorkspaceCatalogMixin):
     ) -> tuple[Path, WorkspaceItem]:
         if not re.fullmatch(r"wsi_[0-9a-f]{32}", workspace_item_id):
             raise WorkspaceError("Invalid workspace item id.")
-        binding = self.binding_by_id(workspace_id)
+        try:
+            binding = self.binding_by_id(workspace_id)
+        except WorkspaceError:
+            # Offline imports can preserve immutable presentation snapshots
+            # under their old built-in ID while the new owner has a fresh
+            # workspace ID. The alias map lives in this owner's catalog only.
+            aliases = self._catalog_metadata("legacy_presentation_aliases") or {}
+            target_id = aliases.get(workspace_id) if isinstance(aliases, dict) else None
+            if not isinstance(target_id, str):
+                raise
+            target = self.binding_by_id(target_id)
+            binding = WorkspaceBinding(workspace_id, target.root, target.display_name)
         root = self._presentation_root(binding)
         for directory in (root / "items", root / "blobs"):
             if directory.is_symlink():

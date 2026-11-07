@@ -39,18 +39,7 @@ class PostgresPracticeRepository:
     async def add_entry(self, owner_user_id: str, payload: dict[str, Any]) -> str:
         entry_id = payload.get("id") or self.new_entry_id()
         async with self._sessions() as db:
-            if payload.get("id"):
-                existing_owner = (
-                    await db.execute(
-                        text("SELECT owner_user_id FROM practice_entries WHERE id=:id"),
-                        {"id": entry_id},
-                    )
-                ).scalar_one_or_none()
-                if existing_owner is not None and existing_owner != owner_user_id:
-                    raise PracticeOwnershipError(
-                        f"practice entry {entry_id} belongs to another user"
-                    )
-            await db.execute(
+            inserted = (await db.execute(
                 text(
                     """INSERT INTO practice_entries (
                         id, owner_user_id, session_id, origin_type, origin_ref, question_id, question,
@@ -61,7 +50,7 @@ class PostgresPracticeRepository:
                         :id,:owner,:session_id,:origin_type,:origin_ref,:question_id,:question,
                         :question_type,CAST(:options AS JSONB),:correct_answer,:explanation,:difficulty,:user_answer,
                         :source,:path_id,:kp_id,:is_correct,:resolved,:bookmarked,:attempt_count,now(),now())
-                    ON CONFLICT (id) DO NOTHING"""
+                    ON CONFLICT (id) DO NOTHING RETURNING id"""
                 ),
                 {
                     "id": entry_id,
@@ -85,7 +74,16 @@ class PostgresPracticeRepository:
                     "bookmarked": bool(payload.get("bookmarked", False)),
                     "attempt_count": int(payload.get("attempt_count", 1)),
                 },
-            )
+            )).scalar_one_or_none()
+            if inserted is None:
+                owned = (await db.execute(
+                    text("SELECT id FROM practice_entries WHERE id=:id AND owner_user_id=:owner"),
+                    {"id": entry_id, "owner": owner_user_id},
+                )).scalar_one_or_none()
+                if owned is None:
+                    raise PracticeOwnershipError(
+                        f"practice entry {entry_id} belongs to another user"
+                    )
             await db.commit()
         return entry_id
 

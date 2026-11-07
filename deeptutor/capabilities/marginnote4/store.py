@@ -519,6 +519,96 @@ class MarginNoteStore:
         return row["n"]
 
 
+class PostgresMarginNoteStore(MarginNoteStore):
+    """Keep the established sync state machine in a PostgreSQL-owned image."""
+
+    def __init__(self, owner_user_id: str, kb_name: str) -> None:
+        if not owner_user_id or not kb_name or len(kb_name) > 256:
+            raise ValueError("MarginNote PostgreSQL store requires an owner and KB name")
+        self.owner_user_id = owner_user_id
+        self.kb_name = kb_name
+
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        import psycopg
+        from deeptutor.services.postgres.database import database_url
+
+        url = database_url().replace("postgresql+asyncpg://", "postgresql://", 1)
+        with psycopg.connect(url) as pg:
+            pg.execute("SELECT set_config('app.user_id', %s, true)", (self.owner_user_id,))
+            pg.execute(
+                """INSERT INTO marginnote4_states
+                   (owner_user_id,kb_name,sqlite_image,revision)
+                   VALUES (%s,%s,%s,0) ON CONFLICT DO NOTHING""",
+                (self.owner_user_id, self.kb_name, b""),
+            )
+            image = pg.execute(
+                """SELECT sqlite_image FROM marginnote4_states
+                   WHERE owner_user_id=%s AND kb_name=%s FOR UPDATE""",
+                (self.owner_user_id, self.kb_name),
+            ).fetchone()[0]
+            conn = sqlite3.connect(":memory:")
+            conn.row_factory = sqlite3.Row
+            try:
+                if image:
+                    conn.deserialize(bytes(image))
+                else:
+                    conn.executescript(_SCHEMA)
+                with conn:
+                    yield conn
+                pg.execute(
+                    """UPDATE marginnote4_states
+                       SET sqlite_image=%s,revision=revision+1
+                       WHERE owner_user_id=%s AND kb_name=%s""",
+                    (conn.serialize(), self.owner_user_id, self.kb_name),
+                )
+            finally:
+                conn.close()
+
+    @staticmethod
+    def _auth_connection():
+        import psycopg
+        from deeptutor.services.postgres.database import authentication_database_url
+
+        return psycopg.connect(
+            authentication_database_url().replace("postgresql+asyncpg://", "postgresql://", 1)
+        )
+
+    def pair_device(self, *, device_name: str = "", device_kind: str = "macos") -> tuple[PairedDevice, str]:
+        device, token = super().pair_device(device_name=device_name, device_kind=device_kind)
+        with self._auth_connection() as pg:
+            pg.execute(
+                """INSERT INTO marginnote4_device_index
+                   (device_id,owner_user_id,kb_name,token_hash,active)
+                   VALUES (%s,%s,%s,%s,true)""",
+                (device.device_id, self.owner_user_id, self.kb_name, _hash_token(token)),
+            )
+        return device, token
+
+    def revoke_device(self, device_id: str) -> bool:
+        revoked = super().revoke_device(device_id)
+        if revoked:
+            with self._auth_connection() as pg:
+                pg.execute(
+                    """UPDATE marginnote4_device_index SET active=false
+                       WHERE device_id=%s AND owner_user_id=%s AND kb_name=%s""",
+                    (device_id, self.owner_user_id, self.kb_name),
+                )
+        return revoked
+
+    @classmethod
+    def open_device(cls, kb_name: str, device_id: str, token: str) -> "PostgresMarginNoteStore | None":
+        with cls._auth_connection() as pg:
+            row = pg.execute(
+                """SELECT owner_user_id,token_hash FROM marginnote4_device_index
+                   WHERE device_id=%s AND kb_name=%s AND active=true""",
+                (device_id, kb_name),
+            ).fetchone()
+        if row is None or not secrets.compare_digest(row[1], _hash_token(token)):
+            return None
+        return cls(row[0], kb_name)
+
+
 def _row_to_device(row: sqlite3.Row) -> PairedDevice:
     return PairedDevice(
         device_id=row["device_id"],

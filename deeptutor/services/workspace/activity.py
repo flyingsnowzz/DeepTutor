@@ -10,6 +10,37 @@ from deeptutor.services.workspace.models import WorkspaceError
 
 
 def acquire_activity(*, exclusive: bool = False):
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        import hashlib
+        import psycopg
+
+        from deeptutor.services.postgres.database import database_url
+        from deeptutor.services.storage_backend import postgres_owner_user_id
+
+        owner = postgres_owner_user_id()
+        key = int.from_bytes(
+            hashlib.sha256(f"deeptutor:workspace-activity:{owner}".encode()).digest()[:8],
+            "big", signed=True,
+        )
+        url = database_url().replace("postgresql+asyncpg://", "postgresql://", 1)
+        handle = psycopg.connect(url, autocommit=True)
+        try:
+            function = "pg_try_advisory_lock" if exclusive else "pg_try_advisory_lock_shared"
+            acquired = handle.execute(f"SELECT {function}(%s)", (key,)).fetchone()[0]
+            if not acquired:
+                raise WorkspaceError(
+                    "Workspace data is busy. Wait for active requests and tasks before retrying."
+                )
+            if not exclusive:
+                from deeptutor.services.workspace.data_migration import assert_no_pending_recovery
+
+                assert_no_pending_recovery()
+            return handle
+        except BaseException:
+            handle.close()
+            raise
     from deeptutor.multi_user.paths import get_account_path_service
 
     root = get_account_path_service().ensure_runtime_state_dir()

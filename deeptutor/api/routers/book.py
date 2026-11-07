@@ -1139,9 +1139,10 @@ async def quiz_attempt(req: QuizAttemptRequest) -> dict[str, Any]:
         verified_grade = _verified_choice_grade(question, req.user_answer)
         trusted_linkage = verified_grade is not None and verified_grade == req.is_correct
         try:
-            from deeptutor.services.session import get_sqlite_session_store
+            from deeptutor.services.session import get_session_store, get_sqlite_session_store
+            from deeptutor.services.storage_backend import storage_backend
 
-            store = get_sqlite_session_store()
+            store = get_session_store() if storage_backend() == "postgres" else get_sqlite_session_store()
             metadata = book.metadata if isinstance(book.metadata, dict) else {}
             page_sessions = metadata.get("page_chat_sessions")
             session_id = str(

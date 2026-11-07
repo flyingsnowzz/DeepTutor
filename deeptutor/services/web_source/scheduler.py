@@ -10,6 +10,7 @@ from typing import Any
 import uuid
 
 from deeptutor.services.web_source.repository import (
+    PostgresWebSourceSyncRepository,
     SQLiteWebSourceSyncRepository,
     WebSourceSyncJob,
 )
@@ -33,7 +34,11 @@ def _hours_ms(hours: int) -> int:
     return hours * 60 * 60 * 1000
 
 
-def default_repository() -> SQLiteWebSourceSyncRepository:
+def default_repository() -> SQLiteWebSourceSyncRepository | PostgresWebSourceSyncRepository:
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        return PostgresWebSourceSyncRepository()
     from deeptutor.multi_user.paths import SYSTEM_ROOT
 
     return SQLiteWebSourceSyncRepository(SYSTEM_ROOT / "web-source-sync.sqlite")
@@ -53,7 +58,7 @@ class WebSourceSyncScheduler:
     def __init__(
         self,
         *,
-        repository: SQLiteWebSourceSyncRepository | None = None,
+        repository: SQLiteWebSourceSyncRepository | PostgresWebSourceSyncRepository | None = None,
         manager_factory: Callable[[], Any] | None = None,
         check_interval_s: float = WEB_SYNC_CHECK_SECONDS,
         max_concurrency: int = WEB_SYNC_MAX_CONCURRENCY,
@@ -69,7 +74,7 @@ class WebSourceSyncScheduler:
         self._sources: dict[tuple[str, str, str], dict[str, Any]] = {}
 
     @property
-    def repo(self) -> SQLiteWebSourceSyncRepository:
+    def repo(self) -> SQLiteWebSourceSyncRepository | PostgresWebSourceSyncRepository:
         if self._repository is None:
             self._repository = default_repository()
         return self._repository

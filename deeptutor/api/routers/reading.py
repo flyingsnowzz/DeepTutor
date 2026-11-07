@@ -457,9 +457,11 @@ async def list_library_materials(
             if _material_allowed(row.material_id)
         ]
         membership = catalog.collections_for_materials([row.material_id for row in rows])
-        from deeptutor.services.session import get_sqlite_session_store
+        from deeptutor.services.session import get_session_store, get_sqlite_session_store
+        from deeptutor.services.storage_backend import storage_backend
 
-        reward_totals = await get_sqlite_session_store().reading_quiz_reward_totals(
+        session_store = get_session_store() if storage_backend() == "postgres" else get_sqlite_session_store()
+        reward_totals = await session_store.reading_quiz_reward_totals(
             [row.material_id for row in rows]
         )
         materials: list[dict[str, Any]] = []

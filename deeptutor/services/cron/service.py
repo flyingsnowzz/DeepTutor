@@ -303,18 +303,8 @@ class CronService:
         if self._running:
             return
         self._load()
-        # Re-arm interval/cron jobs whose due time passed while the server
-        # was down: run once now (next_run in the past stays "due"); expired
-        # one-shots are dropped.
-        now = _now_ms()
-        changed = False
-        for job in list(self._jobs.values()):
-            if job.schedule.kind == "at" and (job.schedule.at_ms or 0) <= now:
-                del self._jobs[job.id]
-                self.repository.delete(job.id)
-                changed = True
-        if changed:
-            self._changed()
+        # Keep overdue one-shots due after a restart, just like repeating
+        # jobs. Dropping them here loses reminders during server downtime.
         self._running = True
         self._timer_task = asyncio.create_task(self._loop(), name="cron:scheduler")
         logger.info("Cron service started (%d jobs)", len(self._jobs))
@@ -408,8 +398,15 @@ def get_cron_service() -> CronService:
     """Process-wide cron service, anchored at the admin workspace."""
     global _service
     if _service is None:
+        from deeptutor.services.storage_backend import storage_backend
         from deeptutor.multi_user.paths import get_admin_path_service
         from deeptutor.services.cron.executor import execute_job
+
+        if storage_backend() == "postgres":
+            from deeptutor.services.cron.repository import PostgresCronRepository
+
+            _service = CronService(repository=PostgresCronRepository(), on_job=execute_job)
+            return _service
 
         root = get_admin_path_service().workspace_root / "cron"
         _service = CronService(

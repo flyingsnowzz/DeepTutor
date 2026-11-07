@@ -16,7 +16,12 @@ type Feature = {
   sessions?: number
   error: string
 }
-type Discovery = { features: Feature[]; historical: { path: string }[]; session_backend: string }
+type Discovery = {
+  features: Feature[]
+  historical: { path: string }[]
+  session_backend: string
+  transfer_available: boolean
+}
 type Preview = {
   features: string[]
   dependencies: string[]
@@ -207,7 +212,15 @@ export default function DataMigrationSettingsSection() {
           )}
         </p>
       ) : null}
-      <fieldset disabled={busy} className="space-y-4 disabled:opacity-60">
+      {discovery?.transfer_available === false ? (
+        <p className="rounded-lg border border-[var(--border)] p-3 text-sm text-[var(--muted-foreground)]">
+          {text(
+            'Workspace bundle transfer is currently unavailable for PostgreSQL workspaces. Existing conversations and files remain accessible.',
+            'PostgreSQL 工作区暂不支持整体数据迁移。已有对话和文件仍可正常访问。'
+          )}
+        </p>
+      ) : null}
+      <fieldset disabled={busy || discovery?.transfer_available === false} className="space-y-4 disabled:opacity-60">
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="space-y-2 text-sm">
             <span>{text('Source workspace', '来源工作区')}</span>
@@ -382,7 +395,7 @@ export default function DataMigrationSettingsSection() {
               ) : null}
               {!['completed', 'exported', 'recovered'].includes(row.status) ? (
                 <button
-                  disabled={busy}
+                  disabled={busy || discovery?.transfer_available === false}
                   onClick={() => void recover(row.id)}
                   className="rounded border border-[var(--border)] px-2 py-1"
                 >

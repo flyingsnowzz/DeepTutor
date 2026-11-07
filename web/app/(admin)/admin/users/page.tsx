@@ -9,7 +9,6 @@ import {
   deleteUsers,
   listUsers,
   deleteUser,
-  setUserRole,
   createUser,
   importUsers,
   type UserRecord,
@@ -26,9 +25,7 @@ import { filterUsersByQuery } from "@/lib/admin-users";
 import { accountRoleLabelKey } from "@/lib/account-role";
 import {
   Search,
-  Shield,
   ShieldCheck,
-  ShieldOff,
   Trash2,
   RefreshCw,
   ArrowLeft,
@@ -58,6 +55,7 @@ export default function AdminUsersPage() {
   const { t, i18n } = useTranslation();
   const lang: Language = i18n.language?.startsWith("zh") ? "zh" : "en";
   const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -70,7 +68,7 @@ export default function AdminUsersPage() {
   const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false);
   const [batchDeleteBusy, setBatchDeleteBusy] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<{
-    kind: "delete" | "promote" | "demote";
+    kind: "delete";
     user: UserRecord;
   } | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
@@ -108,6 +106,7 @@ export default function AdminUsersPage() {
         return;
       }
       setCurrentUser(status.username ?? null);
+      setIsSuperAdmin(Boolean(status.is_super_admin));
       void load();
     });
   }, [router, load]);
@@ -174,19 +173,6 @@ export default function AdminUsersPage() {
       if (kind === "delete") {
         await deleteUser(user.username);
         setUsers((prev) => prev.filter((u) => u.username !== user.username));
-      } else {
-        const newRole = kind === "promote" ? "admin" : "user";
-        await setUserRole(user.username, newRole);
-        setUsers((prev) =>
-          prev.map((u) =>
-            u.username === user.username ? { ...u, role: newRole } : u,
-          ),
-        );
-        if (newRole === "admin") {
-          setExpandedUserId((current) =>
-            current === user.id ? null : current,
-          );
-        }
       }
       setConfirmTarget(null);
     } catch (e) {
@@ -194,9 +180,7 @@ export default function AdminUsersPage() {
       setActionError(
         e instanceof Error
           ? e.message
-          : confirmTarget.kind === "delete"
-            ? t("Failed to delete user")
-            : t("Failed to update role"),
+          : t("Failed to delete user"),
       );
     } finally {
       setConfirmBusy(false);
@@ -318,6 +302,11 @@ export default function AdminUsersPage() {
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              {isSuperAdmin && (
+                <Link href="/admin/accounts" className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--card)]">
+                  {t("Administrators")}
+                </Link>
+              )}
               <button
                 onClick={openCreateDialog}
                 className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm
@@ -604,39 +593,6 @@ export default function AdminUsersPage() {
                             )}
                             <Tooltip label={
                                 isSelf
-                                  ? t("Cannot change your own role")
-                                  : user.role === "admin"
-                                    ? t("Demote to user")
-                                    : t("Promote to admin")
-                              } side="top">
-                              <button
-                                onClick={() =>
-                                  setConfirmTarget({
-                                    kind: isAdmin ? "demote" : "promote",
-                                    user,
-                                  })
-                                }
-                                disabled={isSelf}
-                                aria-label={
-                                  isSelf
-                                    ? t("Cannot change your own role")
-                                    : user.role === "admin"
-                                      ? t("Demote to user")
-                                      : t("Promote to admin")
-                                }
-                                className="rounded-lg p-1.5 text-[var(--muted-foreground)]
-                                         hover:bg-[var(--background)] hover:text-[var(--foreground)]
-                                         disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                              >
-                                {user.role === "admin" ? (
-                                  <ShieldOff size={15} />
-                                ) : (
-                                  <Shield size={15} />
-                                )}
-                              </button>
-                            </Tooltip>
-                            <Tooltip label={
-                                isSelf
                                   ? t("Cannot delete your own account")
                                   : t("Delete {{username}}", {
                                       username: user.username,
@@ -703,28 +659,10 @@ export default function AdminUsersPage() {
 
       <ConfirmDialog
         open={confirmTarget !== null}
-        title={
-          confirmTarget?.kind === "delete"
-            ? t("Delete user")
-            : confirmTarget?.kind === "promote"
-              ? t("Promote to admin")
-              : t("Demote to user")
-        }
-        tone={confirmTarget?.kind === "delete" ? "danger" : "default"}
-        confirmLabel={
-          confirmTarget?.kind === "delete"
-            ? t("Delete user")
-            : confirmTarget?.kind === "promote"
-              ? t("Promote")
-              : t("Demote")
-        }
-        busyLabel={
-          confirmTarget?.kind === "delete"
-            ? t("Deleting…")
-            : confirmTarget?.kind === "promote"
-              ? t("Promoting…")
-              : t("Demoting…")
-        }
+        title={t("Delete user")}
+        tone="danger"
+        confirmLabel={t("Delete user")}
+        busyLabel={t("Deleting…")}
         busy={confirmBusy}
         onConfirm={handleConfirmAction}
         onCancel={() => setConfirmTarget(null)}
@@ -752,17 +690,7 @@ export default function AdminUsersPage() {
               </div>
             </div>
             <p className="mt-3">
-              {confirmTarget.kind === "delete"
-                ? t(
-                    "This permanently removes the account and its assignments. This cannot be undone.",
-                  )
-                : confirmTarget.kind === "promote"
-                  ? t(
-                      "Admins can manage users and assignments, and work in the shared main workspace.",
-                    )
-                  : t(
-                      "They will lose access to the admin area and switch to their own assigned workspace.",
-                    )}
+              {t("This permanently removes the account and its assignments. This cannot be undone.")}
             </p>
           </>
         )}

@@ -482,6 +482,12 @@ def workspace_board(board: TaskBoard, workspace_id: str) -> TaskBoard:
 
 def get_task_board_store(*, migrate_legacy: bool = True) -> TaskBoardStore:
     """Resolve the authenticated account, independently of its current workspace."""
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        from deeptutor.services.postgres.task_board import PostgresTaskBoardStore
+
+        return PostgresTaskBoardStore()
     from deeptutor.multi_user.paths import get_account_path_service
     from deeptutor.services.path_service import get_path_service
     from deeptutor.services.workspace import get_content_workspace_service

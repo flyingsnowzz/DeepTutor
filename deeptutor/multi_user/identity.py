@@ -27,11 +27,8 @@ from .paths import PROJECT_ROOT, SYSTEM_ROOT, migrate_legacy_multi_user_tree
 
 logger = logging.getLogger(__name__)
 
-# Serialises writes to USERS_FILE so a concurrent burst of /register requests
-# cannot all see ``not users`` and each promote themselves to admin. Single-
-# process FastAPI deployments (the ``deeptutor start`` launcher) are fully covered;
-# multi-worker deployments still race and must rely on an external user store
-# (e.g. PocketBase), which is documented in the multi-user README.
+# Serialises local account writes within a single process. A multi-worker
+# deployment needs a shared transactional identity backend for strict uniqueness.
 _USERS_WRITE_LOCK = threading.Lock()
 
 AUTH_DIR = SYSTEM_ROOT / "auth"
@@ -227,21 +224,20 @@ def save_user(
     preset: AccountPreset = "standard",
 ) -> dict[str, Any]:
     USERS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    # Read-modify-write must be atomic so concurrent first-time registrations
-    # cannot each see an empty store and each promote themselves to admin.
+    # Keep read-modify-write atomic for ordinary local account updates.
     with _USERS_WRITE_LOCK:
         # Called without the env arguments on purpose: ``users`` is written back
         # to disk below, and the bootstrap admin must stay an in-memory overlay.
         users = load_users()
-        env_username, _ = _env_bootstrap_admin()
-        # A configured bootstrap admin counts as an existing account, so the
-        # first account an operator creates from /admin/users is not silently
-        # promoted — that endpoint documents role="user" (#849). Re-saving the
-        # bootstrap admin's own username adopts it into the store instead, and
-        # must keep the admin role.
-        account_exists = bool(users) or (bool(env_username) and env_username != username)
-        effective_role: Role = role if account_exists else "admin"
         existing = users.get(username) or {}
+        env_username, env_hash = _env_bootstrap_admin()
+        # Preserve an existing administrator or an explicitly adopted
+        # bootstrap identity when this legacy write API updates credentials.
+        effective_role: Role = (
+            "admin"
+            if existing.get("role") == "admin" or (env_hash and username == env_username)
+            else role
+        )
         effective_preset = str(existing.get("preset") or preset or "standard")
         if effective_preset not in {"standard", "learner", "custom"}:
             effective_preset = preset
@@ -259,6 +255,34 @@ def save_user(
         users[username] = record
         _write_users(users)
     return record
+
+
+def register_public_user(username: str, hashed_password: str) -> dict[str, Any] | None:
+    """Create an ordinary account atomically; never grant an admin role.
+
+    Return ``None`` when the name is already held by a stored account or the
+    configured bootstrap administrator. Public registration must not overwrite
+    credentials, including when two requests arrive together.
+    """
+    with _USERS_WRITE_LOCK:
+        users = load_users()
+        env_username, env_hash = _env_bootstrap_admin()
+        from .admin_identity import get_admin
+
+        if username in users or get_admin(username) is not None or (env_hash and username == env_username):
+            return None
+        record: dict[str, Any] = {
+            "id": new_user_id(),
+            "hash": hashed_password,
+            "role": "user",
+            "created_at": utc_now(),
+            "disabled": False,
+            "avatar": "",
+            "preset": "standard",
+        }
+        users[username] = record
+        _write_users(users)
+        return deepcopy(record)
 
 
 def list_user_info(  # nosec B107 - empty defaults mean "no env fallback supplied".

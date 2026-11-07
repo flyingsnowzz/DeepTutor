@@ -36,6 +36,12 @@ _INTERNAL_DIR = ".deeptutor"
 def _owner_id() -> str:
     # Administrators share the same runtime settings and scope directory.
     # Token/account IDs must not create different system roots in that scope.
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        from deeptutor.services.storage_backend import postgres_owner_user_id
+
+        return postgres_owner_user_id()
     return get_current_user().scope.user_id
 
 
@@ -87,6 +93,17 @@ class WorkspaceCatalogMixin:
 
     @contextmanager
     def _catalog_connection(self):
+        from deeptutor.services.storage_backend import storage_backend
+
+        if storage_backend() == "postgres":
+            from deeptutor.services.storage_backend import postgres_owner_user_id
+            from deeptutor.services.workspace.postgres_catalog import (
+                postgres_workspace_catalog_connection,
+            )
+
+            with postgres_workspace_catalog_connection(postgres_owner_user_id()) as conn:
+                yield conn
+            return
         path = self._catalog_file()
         ensure_private_directory(path.parent)
         conn = sqlite3.connect(path, timeout=30)
@@ -103,7 +120,9 @@ class WorkspaceCatalogMixin:
             conn.close()
 
     def _catalog(self) -> list[dict[str, Any]]:
-        if not self._catalog_file().exists():
+        from deeptutor.services.storage_backend import storage_backend
+
+        if storage_backend() != "postgres" and not self._catalog_file().exists():
             return []
         try:
             with self._catalog_connection() as conn:
@@ -164,7 +183,9 @@ class WorkspaceCatalogMixin:
         return out
 
     def _catalog_metadata(self, key: str) -> Any:
-        if not self._catalog_file().exists():
+        from deeptutor.services.storage_backend import storage_backend
+
+        if storage_backend() != "postgres" and not self._catalog_file().exists():
             return None
         with self._catalog_connection() as conn:
             row = conn.execute("SELECT value FROM metadata WHERE key = ?", (key,)).fetchone()

@@ -10,7 +10,9 @@ BEGIN
 END
 $$;
 
-GRANT CONNECT ON DATABASE deeptutor TO deeptutor_app;
+DO $$ BEGIN
+  EXECUTE format('GRANT CONNECT ON DATABASE %I TO deeptutor_app', current_database());
+END $$;
 GRANT USAGE ON SCHEMA public TO deeptutor_app;
 -- Table/sequence DML grants are also issued by Alembic migration 0003 when
 -- this role exists; the statements below make a fresh image immediately usable.

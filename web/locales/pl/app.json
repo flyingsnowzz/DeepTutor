@@ -6222,5 +6222,13 @@
   "customize.learningHint": "Wybierz metody nauki na tej stronie. Ukryte metody możesz przywrócić w dowolnej chwili.",
   "customize.emptyLearning": "Przygotuj się na kolejny cel nauki",
   "customize.emptyLearningHint": "Dostosuj stronę, aby wyświetlić metody nauki. Niedostępne moduły sprawdzisz w Ustawienia → Środowisko uruchomieniowe.",
-  "customize.learningFooter": "Twój wybór zostanie zapisany na koncie. Wyświetlane są tylko dostępne metody nauki."
+  "customize.learningFooter": "Twój wybór zostanie zapisany na koncie. Wyświetlane są tylko dostępne metody nauki.",
+  "Administrator sign in": "Logowanie administratora",
+  "User sign in": "Logowanie użytkownika",
+  "Administrators": "Administratorzy",
+  "Administrator": "Administrator",
+  "Super administrator": "Superadministrator",
+  "Create administrator": "Utwórz administratora",
+  "Failed to load administrators": "Nie udało się wczytać administratorów",
+  "Failed to create administrator": "Nie udało się utworzyć administratora"
 }

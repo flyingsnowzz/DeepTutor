@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTranslation } from "react-i18next";
-import { register, checkIsFirstUser, fetchAuthStatus } from "@/lib/auth";
+import { register, fetchAuthStatus } from "@/lib/auth";
 
 export default function RegisterPage() {
   const { t } = useTranslation();
@@ -15,8 +15,6 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isFirst, setIsFirst] = useState(false);
-  const [checkingFirst, setCheckingFirst] = useState(true);
 
   useEffect(() => {
     // Redirect if already logged in
@@ -24,11 +22,6 @@ export default function RegisterPage() {
       if (status?.authenticated) router.replace("/");
     });
 
-    // Check if this will be the first (admin) user
-    checkIsFirstUser().then((first) => {
-      setIsFirst(first);
-      setCheckingFirst(false);
-    });
   }, [router]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -62,16 +55,6 @@ export default function RegisterPage() {
           {t("Create your account")}
         </p>
       </div>
-
-      {/* First-user notice */}
-      {!checkingFirst && isFirst && (
-        <div className="mb-4 rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-3 text-sm text-blue-600 dark:text-blue-400">
-          <strong>{t("First user:")}</strong>{" "}
-          {t(
-            "You will be granted admin privileges and can manage other users from the admin dashboard.",
-          )}
-        </div>
-      )}
 
       {/* Card */}
       <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm px-8 py-8">

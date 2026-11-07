@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import json
+import logging
 from typing import Any
 
 from . import paths
@@ -13,6 +14,7 @@ from .context import get_current_user
 # audit root directly; path resolution remains dynamic per call.
 SYSTEM_ROOT = paths.SYSTEM_ROOT
 _DEFAULT_SYSTEM_ROOT = SYSTEM_ROOT
+logger = logging.getLogger(__name__)
 
 
 def _audit_file():
@@ -24,12 +26,38 @@ def _audit_file():
 
 def _write(payload: dict[str, Any]) -> None:
     try:
+        from deeptutor.services.storage_backend import storage_backend
+
+        if storage_backend() == "postgres":
+            _write_postgres(payload)
+            return
         paths.ensure_system_dirs()
         with _audit_file().open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
     except Exception:
-        # Auditing must never break a request.
+        # Auditing must never break a request, but PostgreSQL failures must be visible.
+        logger.exception("Failed to persist account audit event")
         return
+
+
+def _write_postgres(payload: dict[str, Any]) -> None:
+    import psycopg
+
+    from deeptutor.services.postgres.database import database_url
+
+    url = database_url().replace("postgresql+asyncpg://", "postgresql://", 1)
+    kind = "admin" if "actor_role" in payload else "guardian" if "guardian_user_id" in payload else "usage"
+    actor_id = str(payload.get("actor_id") or payload.get("user_id") or "")
+    action = str(payload.get("action") or "")
+    created_at = datetime.fromisoformat(str(payload["time"]))
+    with psycopg.connect(url) as db:
+        db.execute(
+            """INSERT INTO account_audit_events
+               (kind,actor_id,action,target_user_id,payload_json,created_at)
+               VALUES (%s,%s,%s,%s,%s::jsonb,%s)""",
+            (kind, actor_id, action, payload.get("target_user_id"),
+             json.dumps(payload, ensure_ascii=False), created_at),
+        )
 
 
 def log_usage(

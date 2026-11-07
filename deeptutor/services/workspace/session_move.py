@@ -18,6 +18,12 @@ from deeptutor.services.workspace.models import WorkspaceError
 
 
 def move_chat(session_id: str, target_id: str) -> dict:
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        raise WorkspaceError(
+            "Use the owner-bound PostgreSQL session move for text conversations."
+        )
     source_id = current_workspace_id()
     rows = _sessions(get_path_service())
     if session_id not in {row["id"] for row in rows}:
@@ -58,6 +64,10 @@ def migrate_legacy_bindings() -> int:
     would sever learning references. Preserve the original binding for audit
     and normalize once; users can move complete bundles with migration preview.
     """
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        return 0
     from deeptutor.services.file_io import atomic_write_json
     from deeptutor.services.workspace.activity import data_activity
     from deeptutor.services.workspace.data_migration import _backend

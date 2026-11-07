@@ -13,6 +13,7 @@ from the repository root unless a page says otherwise.
 | Install and configure the app | [Agent setup](AGENT_SETUP.md) → [Storage](DATA_STORAGE.md) | Dependencies, module readiness, actual model response, reachable app |
 | Fix an existing installation | [Setup troubleshooting](AGENT_SETUP.md#6-troubleshooting) → the relevant topic below | Original failing action works in the same instance and workspace |
 | Develop a change | [Development](DEVELOPMENT.md) → [Architecture](ARCHITECTURE.md) → [Testing](TESTING.md) | Focused regression and applicable project checks |
+| Understand the project in Chinese | [项目架构与代码导读](项目架构与代码导读.md) → [Architecture](ARCHITECTURE.md) → [Runtime design](RUNTIME_DESIGN.md) | Can trace a Web turn from the frontend to persistence, capability execution and streamed replay |
 | Add a tool or capability | [Tool and capability contracts](TOOLS_AND_CAPABILITIES.md) → [Modules](MODULES.md) | Registration, availability, execution and terminal-result tests |
 | Build a third-party extension | [Plugins](PLUGINS.md) → [Runnable Learning Echo example](examples/learning_echo/README.md) | Wheel, manifest, approval, worker and frontend checks |
 | Investigate streaming or memory | [Events and progress](EVENTS_AND_PROGRESS.md) → [Runtime design](RUNTIME_DESIGN.md) | Persistence/replay and cancellation evidence |
@@ -33,6 +34,7 @@ installation before deciding to reinstall it.
   turns, frontend boundaries and configuration.
 - [Tools and capabilities](TOOLS_AND_CAPABILITIES.md): single-shot tools,
   turn-owning pipelines, context gates and result envelopes.
+- [Capability 功能与使用指南](Capability功能与使用指南.md): 11 种用户能力的选择、配置、示例、组合和排障。
 - [Modules](MODULES.md): distribution ownership, installation and lifecycle.
 - [Plugins](PLUGINS.md): manifests, review, workers, HTTP and static pages.
 - [Reading extensions](READING_EXTENSIONS.md): verified selection context and

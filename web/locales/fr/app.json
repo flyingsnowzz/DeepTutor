@@ -6354,5 +6354,13 @@
   "customize.learningHint": "Choisissez les méthodes d’apprentissage affichées. Vous pouvez rétablir les méthodes masquées à tout moment.",
   "customize.emptyLearning": "Préparez votre prochain objectif d’apprentissage",
   "customize.emptyLearningHint": "Personnalisez cette page pour afficher les méthodes. Consultez les modules indisponibles dans Paramètres → Exécution.",
-  "customize.learningFooter": "Vos choix sont enregistrés dans votre compte. Seules les méthodes disponibles sont affichées."
+  "customize.learningFooter": "Vos choix sont enregistrés dans votre compte. Seules les méthodes disponibles sont affichées.",
+  "Administrator sign in": "Connexion administrateur",
+  "User sign in": "Connexion utilisateur",
+  "Administrators": "Administrateurs",
+  "Administrator": "Administrateur",
+  "Super administrator": "Super administrateur",
+  "Create administrator": "Créer un administrateur",
+  "Failed to load administrators": "Impossible de charger les administrateurs",
+  "Failed to create administrator": "Impossible de créer l’administrateur"
 }

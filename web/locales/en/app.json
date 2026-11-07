@@ -6200,5 +6200,13 @@
   "customize.learningHint": "Choose the learning methods shown on this page. Hidden methods can be added back at any time.",
   "customize.emptyLearning": "Make room for your next learning goal",
   "customize.emptyLearningHint": "Customize this page to show learning methods. Unavailable modules can be reviewed in Settings → Runtime.",
-  "customize.learningFooter": "Your choices are saved to your account. Only learning methods available in this environment are shown."
+  "customize.learningFooter": "Your choices are saved to your account. Only learning methods available in this environment are shown.",
+  "Administrator sign in": "Administrator sign in",
+  "User sign in": "User sign in",
+  "Administrators": "Administrators",
+  "Administrator": "Administrator",
+  "Super administrator": "Super administrator",
+  "Create administrator": "Create administrator",
+  "Failed to load administrators": "Failed to load administrators",
+  "Failed to create administrator": "Failed to create administrator"
 }

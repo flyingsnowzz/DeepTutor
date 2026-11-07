@@ -26,7 +26,9 @@ from pydantic import BaseModel, Field
 
 from deeptutor.api.routers.auth import require_auth
 from deeptutor.capabilities.marginnote4.models import MarginNoteObject, SyncBatch
-from deeptutor.capabilities.marginnote4.store import MarginNoteStore, resolve_db_path
+from deeptutor.capabilities.marginnote4.store import (
+    MarginNoteStore, PostgresMarginNoteStore, resolve_db_path,
+)
 from deeptutor.services.path_service import PathService
 
 logger = logging.getLogger(__name__)
@@ -62,6 +64,10 @@ def _device_db_path(kb_name: str) -> Path:
 
 def _store_for(request: Request) -> MarginNoteStore:
     """Resolve (creating if absent) the store for a session-authenticated call."""
+    from deeptutor.services.storage_backend import postgres_owner_user_id, storage_backend
+
+    if storage_backend() == "postgres":
+        return PostgresMarginNoteStore(postgres_owner_user_id(), _requested_kb(request))
     return MarginNoteStore(resolve_db_path(_requested_kb(request)))
 
 
@@ -79,7 +85,12 @@ def _auth_device(request: Request, authorization: str | None) -> tuple[str, Marg
     if ":" not in raw:
         raise HTTPException(401, "Invalid Authorization format.")
     device_id, token = raw.split(":", 1)
-    store = MarginNoteStore.open_existing(_device_db_path(_requested_kb(request)))
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        store = PostgresMarginNoteStore.open_device(_requested_kb(request), device_id, token)
+    else:
+        store = MarginNoteStore.open_existing(_device_db_path(_requested_kb(request)))
     if store is None or not store.verify_token(device_id, token):
         raise HTTPException(403, "Invalid device credentials.")
     store.touch_device(device_id)
@@ -153,7 +164,9 @@ async def pair_device(body: PairRequest, request: Request) -> PairResponse:
     Returns a one-time token the Add-on stores and presents on every sync.
     """
     kb_name = _requested_kb(request)
-    if resolve_db_path(kb_name) != _device_db_path(kb_name):
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() != "postgres" and resolve_db_path(kb_name) != _device_db_path(kb_name):
         # Pairing runs under a session and resolves the caller's own
         # workspace; /sync does not and resolves the default one. Where those
         # differ, pairing would hand out a token that 403s on every sync

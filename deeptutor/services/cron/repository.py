@@ -248,4 +248,86 @@ class SQLiteCronRepository:
                 raise
 
 
-__all__ = ["CronRepository", "SQLiteCronRepository"]
+class PostgresCronRepository:
+    """Shared scheduler persistence; application service enforces owner access."""
+
+    @staticmethod
+    @contextlib.contextmanager
+    def _connect():
+        import psycopg
+        from psycopg.rows import dict_row
+
+        from deeptutor.services.postgres.database import database_url
+
+        url = database_url().replace("postgresql+asyncpg://", "postgresql://", 1)
+        with psycopg.connect(url, row_factory=dict_row) as connection:
+            yield connection
+
+    def revision(self) -> int:
+        with self._connect() as connection:
+            return int(connection.execute(
+                "SELECT revision FROM scheduled_jobs_meta WHERE id=1"
+            ).fetchone()["revision"])
+
+    def list_payloads(self) -> list[dict[str, Any]]:
+        with self._connect() as connection:
+            return [row["payload_json"] for row in connection.execute(
+                "SELECT payload_json FROM scheduled_jobs ORDER BY COALESCE(next_run_at_ms,0),id"
+            ).fetchall()]
+
+    def upsert(self, payload: dict[str, Any]) -> None:
+        from psycopg.types.json import Jsonb
+
+        job_id = str(payload.get("id") or "").strip()
+        if not job_id:
+            raise ValueError("cron job id is required")
+        owner_key = SQLiteCronRepository._owner_key(payload)
+        next_run = (payload.get("state") or {}).get("next_run_at_ms")
+        with self._connect() as connection:
+            # The metadata row is a global mutex for concurrent workers.
+            connection.execute("SELECT revision FROM scheduled_jobs_meta WHERE id=1 FOR UPDATE")
+            existing = connection.execute(
+                "SELECT owner_key FROM scheduled_jobs WHERE id=%s", (job_id,)
+            ).fetchone()
+            if existing and existing["owner_key"] != owner_key:
+                raise ValueError("cron job owner cannot change")
+            connection.execute("""INSERT INTO scheduled_jobs
+                (id,owner_key,next_run_at_ms,payload_json,updated_at_ms)
+                VALUES (%s,%s,%s,%s,%s)
+                ON CONFLICT(id) DO UPDATE SET
+                    next_run_at_ms=excluded.next_run_at_ms,
+                    payload_json=excluded.payload_json,
+                    updated_at_ms=excluded.updated_at_ms""", (
+                    job_id, owner_key, int(next_run) if next_run is not None else None,
+                    Jsonb(payload), int(time.time() * 1000),
+                ))
+            connection.execute("UPDATE scheduled_jobs_meta SET revision=revision+1 WHERE id=1")
+
+    def delete(self, job_id: str, *, owner_key: str | None = None) -> bool:
+        with self._connect() as connection:
+            connection.execute("SELECT revision FROM scheduled_jobs_meta WHERE id=1 FOR UPDATE")
+            if owner_key is None:
+                cursor = connection.execute("DELETE FROM scheduled_jobs WHERE id=%s", (job_id,))
+            else:
+                cursor = connection.execute(
+                    "DELETE FROM scheduled_jobs WHERE id=%s AND owner_key=%s",
+                    (job_id, owner_key),
+                )
+            changed = bool(cursor.rowcount)
+            if changed:
+                connection.execute("UPDATE scheduled_jobs_meta SET revision=revision+1 WHERE id=1")
+            return changed
+
+    def delete_owner(self, owner_key: str) -> int:
+        with self._connect() as connection:
+            connection.execute("SELECT revision FROM scheduled_jobs_meta WHERE id=1 FOR UPDATE")
+            cursor = connection.execute(
+                "DELETE FROM scheduled_jobs WHERE owner_key=%s", (owner_key,)
+            )
+            count = max(0, int(cursor.rowcount or 0))
+            if count:
+                connection.execute("UPDATE scheduled_jobs_meta SET revision=revision+1 WHERE id=1")
+            return count
+
+
+__all__ = ["CronRepository", "SQLiteCronRepository", "PostgresCronRepository"]

@@ -36,8 +36,27 @@ async def engine(database_url):
 
 
 @pytest_asyncio.fixture
-async def accounts(engine) -> AccountService:
-    return AccountService(engine)
+async def auth_engine():
+    from deeptutor.services.postgres.database import authentication_database_url
+
+    engine = create_engine(authentication_database_url())
+    try:
+        yield engine
+    finally:
+        await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def accounts(database_url) -> AccountService:
+    from deeptutor.services.postgres.database import authentication_database_url
+
+    # Test-account provisioning is an auth operation, even when the runtime
+    # DATABASE_URL deliberately uses the RLS-restricted learning-data role.
+    account_engine = create_engine(authentication_database_url())
+    try:
+        yield AccountService(account_engine)
+    finally:
+        await account_engine.dispose()
 
 
 @pytest.fixture

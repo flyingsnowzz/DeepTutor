@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
@@ -24,6 +26,40 @@ MIN_DAILY_LIMIT_MINUTES = 5
 MAX_DAILY_LIMIT_MINUTES = 24 * 60
 
 _DEVICE_WRITE_LOCK = threading.Lock()
+_PG_DEVICE_CONNECTION: ContextVar[Any | None] = ContextVar("pg_device_connection", default=None)
+
+
+def _postgres_mode() -> bool:
+    from deeptutor.services.storage_backend import storage_backend
+
+    return storage_backend() == "postgres"
+
+
+def _pg_connect(*, auth: bool = False):
+    import psycopg
+    from deeptutor.services.postgres.database import authentication_database_url, database_url
+
+    url = (authentication_database_url() if auth else database_url()).replace(
+        "postgresql+asyncpg://", "postgresql://", 1
+    )
+    return psycopg.connect(url)
+
+
+@contextmanager
+def _device_write_lock():
+    with _DEVICE_WRITE_LOCK:
+        if not _postgres_mode():
+            yield
+            return
+        with _pg_connect() as db:
+            db.execute("INSERT INTO device_credential_state(id,records_json,revision) "
+                       "VALUES (1,'[]'::jsonb,0) ON CONFLICT(id) DO NOTHING")
+            db.execute("SELECT id FROM device_credential_state WHERE id=1 FOR UPDATE")
+            token = _PG_DEVICE_CONNECTION.set(db)
+            try:
+                yield
+            finally:
+                _PG_DEVICE_CONNECTION.reset(token)
 
 
 def utc_now() -> datetime:
@@ -111,10 +147,21 @@ def _valid_usage_day(value: str) -> bool:
 
 
 def _load_records() -> list[dict[str, Any]]:
-    try:
-        loaded = json.loads(DEVICE_CREDENTIALS_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return []
+    if _postgres_mode():
+        db = _PG_DEVICE_CONNECTION.get()
+        if db is None:
+            with _pg_connect() as connection:
+                row = connection.execute(
+                    "SELECT records_json FROM device_credential_state WHERE id=1"
+                ).fetchone()
+        else:
+            row = db.execute("SELECT records_json FROM device_credential_state WHERE id=1").fetchone()
+        loaded = row[0] if row else []
+    else:
+        try:
+            loaded = json.loads(DEVICE_CREDENTIALS_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            return []
     if not isinstance(loaded, list):
         return []
     records: list[dict[str, Any]] = []
@@ -129,6 +176,15 @@ def _load_records() -> list[dict[str, Any]]:
 
 
 def _write_records(records: list[dict[str, Any]]) -> None:
+    if _postgres_mode():
+        db = _PG_DEVICE_CONNECTION.get()
+        if db is None:
+            raise RuntimeError("Device credential writes require a PostgreSQL lock")
+        db.execute(
+            "UPDATE device_credential_state SET records_json=%s::jsonb,revision=revision+1 WHERE id=1",
+            (json.dumps(records, ensure_ascii=False),),
+        )
+        return
     DEVICE_CREDENTIALS_FILE.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_text(
         DEVICE_CREDENTIALS_FILE,
@@ -152,6 +208,17 @@ def _public_record(record: dict[str, Any]) -> dict[str, Any]:
 
 
 def _active_account(user_id: str) -> tuple[str, dict[str, Any]] | None:
+    if _postgres_mode():
+        with _pg_connect(auth=True) as db:
+            db.execute("SELECT set_config('app.user_id', %s, true)", (user_id,))
+            row = db.execute(
+                """SELECT u.username,u.role,u.preset FROM users u
+                   JOIN first_party_credentials c ON c.owner_user_id=u.id
+                   WHERE u.id=%s AND u.is_active=true""", (user_id,),
+            ).fetchone()
+        if row is None or row[2] != "learner":
+            return None
+        return str(row[0]), {"role": row[1], "preset": row[2]}
     account = get_user_by_id(user_id)
     if account is None:
         return None
@@ -251,7 +318,7 @@ def issue_device_credential(
         "revoked_at": None,
         "revoked_by": "",
     }
-    with _DEVICE_WRITE_LOCK:
+    with _device_write_lock():
         records = _load_records()
         records.append(record)
         _write_records(records)
@@ -278,7 +345,7 @@ def begin_device_session(
     pairing_hash = _hash_pairing_code(pairing_code)
     from deeptutor.services.auth import verify_password
 
-    with _DEVICE_WRITE_LOCK:
+    with _device_write_lock():
         records = _load_records()
         record = next(
             (item for item in records if item["pairing_code_hash"] == pairing_hash),
@@ -351,7 +418,7 @@ def heartbeat_device_credential(
     """Advance daily usage and refresh the server heartbeat lease."""
 
     current = now or utc_now()
-    with _DEVICE_WRITE_LOCK:
+    with _device_write_lock():
         records = _load_records()
         record = next(
             (item for item in records if item["id"] == credential_id),
@@ -392,7 +459,7 @@ def revoke_device_credential(
     credential_id: str, *, revoked_by: str, now: datetime | None = None
 ) -> dict[str, Any] | None:
     current = now or utc_now()
-    with _DEVICE_WRITE_LOCK:
+    with _device_write_lock():
         records = _load_records()
         for record in records:
             if record["id"] != credential_id:
@@ -411,7 +478,7 @@ def revoke_device_credentials_for_user(
     """Revoke every active device credential and session for one learner."""
 
     current = now or utc_now()
-    with _DEVICE_WRITE_LOCK:
+    with _device_write_lock():
         records = _load_records()
         changed = 0
         for record in records:

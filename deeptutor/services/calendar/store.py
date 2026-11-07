@@ -522,6 +522,12 @@ class CalendarStore:
 
 
 def get_calendar_store():
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        from deeptutor.services.postgres.calendar_store import PostgresCalendarStore
+
+        return PostgresCalendarStore()
     from deeptutor.multi_user.paths import get_account_path_service
 
     return CalendarStore(

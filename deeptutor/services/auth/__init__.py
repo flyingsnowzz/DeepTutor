@@ -4,23 +4,17 @@ Authentication service for DeepTutor.
 Disabled by default (auth.enabled=false) so localhost users are unaffected.
 When enabled, guards all API routes with JWT bearer tokens.
 
-Quick setup (single user via data/user/settings/auth.json):
+Quick setup (deployment super administrator via data/user/settings/auth.json):
     1. Set enabled=true
-    2. Set username=<your username>
+    2. Set username=<administrator username>
     3. Generate a password hash:
            python -c "from deeptutor.services.auth import hash_password; print(hash_password('yourpassword'))"
-       Paste the output into password_hash=<hash>
+       Paste the output into password_hash=<hash>, then restart.
 
-Multi-user setup (recommended):
-    Enable auth and leave username/password_hash empty.
-    Navigate to /register in the browser. The first user to register is granted
-    admin privileges and can manage other users from /admin/users.
-
-    Users are stored in data/user/auth_users.json:
-        {
-            "alice": {"hash": "$2b$12$...", "role": "admin", "created_at": "2026-..."},
-            "bob":   {"hash": "$2b$12$...", "role": "user",  "created_at": "2026-..."}
-        }
+Ordinary users may register through /register and sign in through /login.
+Administrators sign in through /admin/login. The super administrator creates
+delegated administrators through /admin/accounts. Their credentials live in
+data/system/auth/admins.json; ordinary accounts live in users.json.
 """
 
 from dataclasses import dataclass
@@ -75,6 +69,8 @@ class TokenPayload:
     user_id: str = ""
     device_credential_id: str = ""
     device_session_nonce: str = ""
+    account_kind: str = "user"
+    is_super_admin: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -141,7 +137,7 @@ def _load_users() -> dict[str, dict]:
 
 
 def is_first_user() -> bool:
-    """Return True when no users exist yet (first registration will become admin)."""
+    """Return True when no accounts have been configured yet."""
     return len(_load_users()) == 0
 
 
@@ -154,9 +150,7 @@ def add_user(
     """
     Add or update a user in data/user/auth_users.json.
 
-    The role defaults to 'user'. Pass role='admin' to elevate. When the store
-    is empty the first user is automatically promoted to 'admin' regardless of
-    the role argument.
+    The role defaults to 'user'; an empty store never grants elevation.
 
     Creates the file (and parent directories) if they don't exist.
     """
@@ -263,6 +257,7 @@ def create_token(
     user_id: str | None = None,
     device_credential_id: str = "",
     device_session_nonce: str = "",
+    account_kind: str = "user",
 ) -> str:
     """Create a signed JWT for the given username and role."""
     from jose import jwt
@@ -277,6 +272,7 @@ def create_token(
         "uid": user_id,
         "dcid": device_credential_id,
         "dcs": device_session_nonce,
+        "kind": account_kind,
         "exp": datetime.now(timezone.utc) + timedelta(hours=TOKEN_EXPIRE_HOURS),
         "iat": datetime.now(timezone.utc),
     }
@@ -325,6 +321,26 @@ def decode_token(token: str) -> TokenPayload | None:
             user_id = str(record.get("id") or "")
         device_credential_id = str(payload.get("dcid") or "")
         device_session_nonce = str(payload.get("dcs") or "")
+        account_kind = str(payload.get("kind") or "user")
+        if account_kind == "admin":
+            from deeptutor.multi_user.admin_identity import get_admin_by_id
+
+            administrator = get_admin_by_id(user_id)
+            if (
+                administrator is None
+                or administrator[0] != username
+                or administrator[1].get("disabled")
+            ):
+                return None
+            return TokenPayload(
+                username=username,
+                role="admin",
+                user_id=user_id,
+                account_kind="admin",
+                is_super_admin=bool(administrator[1].get("super_admin")),
+            )
+        if account_kind != "user":
+            return None
         if device_credential_id:
             from deeptutor.multi_user.device_credentials import validate_device_token
 
@@ -340,6 +356,7 @@ def decode_token(token: str) -> TokenPayload | None:
             user_id=user_id,
             device_credential_id=device_credential_id,
             device_session_nonce=device_session_nonce,
+            account_kind="user",
         )
     except JWTError:
         return None
@@ -434,6 +451,10 @@ def authenticate(username: str, password: str) -> TokenPayload | None:
     if not record:
         return None
 
+    # Administrator credentials are accepted only by the dedicated endpoint.
+    if record.get("role") == "admin":
+        return None
+
     hashed = record.get("hash", "") if isinstance(record, dict) else record
     if not verify_password(password, hashed):
         return None
@@ -441,6 +462,34 @@ def authenticate(username: str, password: str) -> TokenPayload | None:
     role = record.get("role", "user") if isinstance(record, dict) else "user"
     user_id = str(record.get("id") or "") if isinstance(record, dict) else ""
     return TokenPayload(username=username, role=role, user_id=user_id)
+
+
+def authenticate_admin(username: str, password: str) -> TokenPayload | None:
+    """Authenticate a deployment or delegated administrator."""
+    if not AUTH_ENABLED or POCKETBASE_ENABLED:
+        return None
+    from deeptutor.multi_user.admin_identity import get_admin
+
+    record = get_admin(username)
+    if record is None or record.get("disabled"):
+        # Existing admin records continue to work through the admin entrance
+        # until an operator migrates them to the separate administrator store.
+        legacy = _load_users().get(username)
+        if legacy is None or legacy.get("role") != "admin" or legacy.get("disabled"):
+            return None
+        record = legacy
+        kind = "user"
+    else:
+        kind = "admin"
+    if not verify_password(password, str(record.get("hash") or "")):
+        return None
+    return TokenPayload(
+        username=username,
+        role="admin",
+        user_id=str(record.get("id") or ""),
+        account_kind=kind,
+        is_super_admin=bool(record.get("super_admin")),
+    )
 
 
 def authenticate_device(pairing_code: str, pin: str) -> TokenPayload | None:

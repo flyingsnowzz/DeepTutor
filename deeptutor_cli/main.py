@@ -102,7 +102,7 @@ def run_capability(
     fmt: str = typer.Option("rich", "--format", "-f", help="Output format: rich | json."),
 ) -> None:
     """Run any capability in a single turn (agent-first entry point)."""
-    from deeptutor.app import DeepTutorApp
+    from deeptutor_cli.app import create_cli_app
 
     from .common import run_turn_and_render
 
@@ -118,7 +118,7 @@ def run_capability(
         notebook_refs=notebook_ref,
         history_refs=history_ref,
     )
-    client = DeepTutorApp(workspace_id=workspace) if workspace is not None else DeepTutorApp()
+    client = create_cli_app(workspace_id=workspace)
     maybe_run(run_turn_and_render(app=client, request=request, fmt=fmt))
 
 

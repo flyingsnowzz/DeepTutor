@@ -101,9 +101,10 @@ async def _resolve_chat_selections(
     if not selections:
         return []
     try:
-        from deeptutor.services.session import get_sqlite_session_store
+        from deeptutor.services.session import get_session_store, get_sqlite_session_store
+        from deeptutor.services.storage_backend import storage_backend
 
-        store = get_sqlite_session_store()
+        store = get_session_store() if storage_backend() == "postgres" else get_sqlite_session_store()
     except Exception as exc:
         logger.warning(f"Chat session store unavailable: {exc}")
         return []
@@ -239,9 +240,10 @@ async def _resolve_question_notebook(
     if not category_ids and not entry_ids:
         return "", 0
     try:
-        from deeptutor.services.session import get_sqlite_session_store
+        from deeptutor.services.session import get_session_store, get_sqlite_session_store
+        from deeptutor.services.storage_backend import storage_backend
 
-        store = get_sqlite_session_store()
+        store = get_session_store() if storage_backend() == "postgres" else get_sqlite_session_store()
     except Exception as exc:
         logger.warning(f"Question notebook unavailable: {exc}")
         return "", 0

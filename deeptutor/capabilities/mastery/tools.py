@@ -331,10 +331,12 @@ async def _resolve_pending_choice(
     options = pending.choice_map
     if not has_option_bodies(options):
         try:
-            from deeptutor.services.session import get_sqlite_session_store
+            from deeptutor.services.session import get_session_store, get_sqlite_session_store
+            from deeptutor.services.storage_backend import storage_backend
 
             options = await recover_options_from_turn(
-                get_sqlite_session_store(), turn_id, pending.prompt
+                get_session_store() if storage_backend() == "postgres" else get_sqlite_session_store(),
+                turn_id, pending.prompt
             )
         except Exception:
             logger.warning("Failed to recover legacy mastery choice options", exc_info=True)

@@ -13,7 +13,7 @@ across refreshes.
 
 from __future__ import annotations
 
-from contextlib import closing
+from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -49,7 +49,9 @@ def _sha1(*parts: object) -> str:
     return h.hexdigest()[:16]
 
 
-def _iso(ts: float | int | str | None) -> str:
+def _iso(ts: datetime | float | int | str | None) -> str:
+    if isinstance(ts, datetime):
+        return ts.isoformat()
     if isinstance(ts, str):
         try:
             datetime.fromisoformat(ts.replace("Z", "+00:00"))
@@ -105,6 +107,119 @@ def _iter_chat_dbs() -> list[tuple[str, Path]]:
             continue
         pairs.append((f"ws:{binding.workspace_id}:", paths.get_chat_history_db()))
     return pairs
+
+
+@contextmanager
+def _postgres_connection():
+    import psycopg
+    from psycopg.rows import dict_row
+
+    from deeptutor.services.postgres.database import database_url
+    from deeptutor.services.storage_backend import postgres_owner_user_id
+
+    owner = postgres_owner_user_id()
+    url = database_url().replace("postgresql+asyncpg://", "postgresql://", 1)
+    with psycopg.connect(url, row_factory=dict_row) as db:
+        db.execute("SELECT set_config('app.user_id', %s, true)", (owner,))
+        yield db, owner
+
+
+def _chat_identity(session: dict) -> tuple[str, dict[str, Any]]:
+    sid = str(session["id"])
+    workspace_id = str(session.get("workspace_id") or "")
+    qualifier = f"ws:{workspace_id}:" if workspace_id else ""
+    metadata: dict[str, Any] = {"session_id": sid}
+    if workspace_id:
+        metadata["workspace_id"] = workspace_id
+    return qualifier + sid, metadata
+
+
+def _read_postgres_chat_entities() -> list[Entity]:
+    with _postgres_connection() as (db, owner):
+        sessions = db.execute("""SELECT id,title,updated_at,
+                COALESCE(preferences_json->>'workspace_id','') AS workspace_id
+            FROM sessions WHERE owner_user_id=%s ORDER BY updated_at DESC,id""", (owner,)).fetchall()
+        messages = db.execute("""SELECT session_id,id,legacy_message_id,role,content,created_at
+            FROM messages WHERE owner_user_id=%s ORDER BY session_id,created_at,id""", (owner,)).fetchall()
+    by_session: dict[str, list[dict]] = {}
+    for message in messages:
+        by_session.setdefault(message["session_id"], []).append(message)
+    result: list[Entity] = []
+    for session in sessions:
+        sid = session["id"]
+        own_messages = by_session.get(sid, [])
+        blocks = [
+            f"### {message['role']}\n{str(message['content'] or '').strip()}"
+            for message in own_messages if str(message["content"] or "").strip()
+        ]
+        last = own_messages[-1] if own_messages else None
+        last_id = (last["legacy_message_id"] or last["id"]) if last else 0
+        entity_id, metadata = _chat_identity(session)
+        metadata["message_count"] = len(own_messages)
+        result.append(Entity(
+            id=entity_id, label=session["title"] or sid,
+            ts=_iso(session["updated_at"]), content="\n\n".join(blocks),
+            metadata=metadata,
+            fingerprint=_sha1(last_id, session["updated_at"].timestamp()),
+        ))
+    return result
+
+
+def _probe_postgres_chat_entities() -> list[EntityStamp]:
+    with _postgres_connection() as (db, owner):
+        rows = db.execute("""SELECT s.id,s.title,s.updated_at,
+                COALESCE(s.preferences_json->>'workspace_id','') AS workspace_id,
+                (SELECT COALESCE(m.legacy_message_id,m.id) FROM messages m
+                 WHERE m.owner_user_id=s.owner_user_id AND m.session_id=s.id
+                 ORDER BY m.created_at DESC,m.id DESC LIMIT 1) AS last_message_id
+            FROM sessions s WHERE s.owner_user_id=%s
+            ORDER BY s.updated_at DESC,s.id""", (owner,)).fetchall()
+    return [EntityStamp(
+        id=_chat_identity(row)[0], label=row["title"] or row["id"],
+        fingerprint=_sha1(row["last_message_id"] or 0, row["updated_at"].timestamp()),
+        ts=_iso(row["updated_at"]),
+    ) for row in rows]
+
+
+def _read_postgres_quiz_entities() -> list[Entity]:
+    with _postgres_connection() as (db, owner):
+        rows = db.execute("""SELECT c.id,c.session_id,c.turn_id,c.question_id,
+                c.card_json,c.created_at,
+                COALESCE(s.preferences_json->>'workspace_id','') AS workspace_id
+            FROM assessment_cards c LEFT JOIN sessions s
+              ON s.id=c.session_id AND s.owner_user_id=c.owner_user_id
+            WHERE c.owner_user_id=%s ORDER BY c.created_at DESC,c.id""", (owner,)).fetchall()
+    result: list[Entity] = []
+    for row in rows:
+        card = row["card_json"] or {}
+        qid = row["question_id"] or f"row_{row['id']}"
+        question = str(card.get("question") or "").strip()
+        answer = str(card.get("user_answer") or "").strip()
+        correct = str(card.get("correct_answer") or "").strip()
+        explanation = str(card.get("explanation") or "").strip()
+        is_correct = bool(card.get("is_correct"))
+        workspace_id = str(row["workspace_id"] or "")
+        qualifier = f"ws:{workspace_id}:" if workspace_id else ""
+        metadata = {
+            "session_id": row["session_id"], "turn_id": row["turn_id"],
+            "question_id": qid, "question_type": card.get("question_type"),
+            "difficulty": card.get("difficulty"), "is_correct": is_correct,
+            "bookmarked": bool(card.get("bookmarked")),
+        }
+        if workspace_id:
+            metadata["workspace_id"] = workspace_id
+        result.append(Entity(
+            id=f"{qualifier}{row['session_id']}:{qid}",
+            label=question[:80] or qid, ts=_iso(row["created_at"]),
+            content="\n\n".join(part for part in (
+                f"**Question**: {question}" if question else "",
+                f"**User answer**: {answer}" if answer else "",
+                f"**Correct answer**: {correct}" if correct else "",
+                f"**Explanation**: {explanation}" if explanation else "",
+            ) if part), metadata=metadata,
+            fingerprint=_sha1(question, answer, correct, is_correct),
+        ))
+    return result
 
 
 # ── Adapters ─────────────────────────────────────────────────────────
@@ -466,6 +581,10 @@ def read_chat_entities() -> list[Entity]:
     qualifier plus a ``workspace_id`` in metadata, so account-level Memory
     sees every conversation with provenance and no id collisions (#1799).
     """
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        return _read_postgres_chat_entities()
     out: list[Entity] = []
     for qualifier, db_path in _iter_chat_dbs():
         if not db_path.exists():
@@ -518,6 +637,10 @@ def read_chat_entities() -> list[Entity]:
 def read_quiz_entities() -> list[Entity]:
     """One Entity per recorded quiz attempt (notebook_entries row), across
     the account's workspaces with the same qualifier scheme as chat (#1799)."""
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        return _read_postgres_quiz_entities()
     out: list[Entity] = []
     for qualifier, db_path in _iter_chat_dbs():
         if not db_path.exists():
@@ -598,6 +721,10 @@ def probe_chat_entities() -> list[EntityStamp]:
     Iterates the same workspace-qualified chat dbs as :func:`read_chat_entities`
     (#1799) — the qualifier expression must stay mirrored exactly.
     """
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        return _probe_postgres_chat_entities()
     out: list[EntityStamp] = []
     for qualifier, db_path in _iter_chat_dbs():
         if not db_path.exists():
@@ -663,6 +790,10 @@ def read_entities(surface: Surface) -> list[Entity]:
         return reader()
     except Exception as exc:
         logger.warning("snapshot adapter failed surface=%s: %s", surface, exc)
+        from deeptutor.services.storage_backend import storage_backend
+
+        if surface in {"chat", "quiz"} and storage_backend() == "postgres":
+            raise
         return []
 
 
@@ -681,6 +812,10 @@ def read_stamps(surface: Surface) -> list[EntityStamp]:
             return probe()
         except Exception as exc:
             logger.warning("snapshot probe failed surface=%s; full read: %s", surface, exc)
+            from deeptutor.services.storage_backend import storage_backend
+
+            if surface == "chat" and storage_backend() == "postgres":
+                raise
     return [
         EntityStamp(id=e.id, label=e.label, fingerprint=e.fingerprint, ts=e.ts)
         for e in read_entities(surface)

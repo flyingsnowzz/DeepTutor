@@ -20,9 +20,11 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 
 from deeptutor.services.session import (
+    get_session_store,
     get_sqlite_session_store,
     make_imported_session_id,
 )
+from deeptutor.services.storage_backend import storage_backend
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +83,7 @@ async def import_chat_history(payload: ChatHistoryImportRequest) -> dict[str, An
             detail=f"Too many sessions in one request (max {_MAX_SESSIONS_PER_REQUEST})",
         )
 
-    store = get_sqlite_session_store()
+    store = get_session_store() if storage_backend() == "postgres" else get_sqlite_session_store()
     imported = 0
     skipped = 0
     results: list[dict[str, Any]] = []
@@ -100,6 +102,13 @@ async def import_chat_history(payload: ChatHistoryImportRequest) -> dict[str, An
             messages = messages[:_MAX_MESSAGES_PER_SESSION]
 
         session_id = make_imported_session_id(payload.source, incoming.external_id)
+        if storage_backend() == "postgres":
+            # Legacy imports retain their original ID; new imports need a
+            # per-owner ID because sessions.id is a database-wide primary key.
+            if await store.get_session(session_id) is None:
+                session_id = make_imported_session_id(
+                    payload.source, f"{store.owner_user_id}:{incoming.external_id}"
+                )
         import_meta: dict[str, Any] = {
             "source": payload.source,
             "source_cwd": incoming.source_cwd,
@@ -141,6 +150,6 @@ async def list_imported_chat_history(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> dict[str, Any]:
-    store = get_sqlite_session_store()
+    store = get_session_store() if storage_backend() == "postgres" else get_sqlite_session_store()
     sessions = await store.list_imported_sessions(limit=limit, offset=offset)
     return {"sessions": sessions}

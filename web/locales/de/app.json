@@ -6200,5 +6200,13 @@
   "customize.learningHint": "Wähle die Lernmethoden auf dieser Seite. Ausgeblendete Methoden lassen sich jederzeit wieder hinzufügen.",
   "customize.emptyLearning": "Bereite dein nächstes Lernziel vor",
   "customize.emptyLearningHint": "Passe diese Seite an, um Lernmethoden anzuzeigen. Nicht verfügbare Module findest du unter Einstellungen → Laufzeit.",
-  "customize.learningFooter": "Deine Auswahl wird in deinem Konto gespeichert. Es werden nur verfügbare Lernmethoden angezeigt."
+  "customize.learningFooter": "Deine Auswahl wird in deinem Konto gespeichert. Es werden nur verfügbare Lernmethoden angezeigt.",
+  "Administrator sign in": "Administratoranmeldung",
+  "User sign in": "Benutzeranmeldung",
+  "Administrators": "Administratoren",
+  "Administrator": "Administrator",
+  "Super administrator": "Superadministrator",
+  "Create administrator": "Administrator erstellen",
+  "Failed to load administrators": "Administratoren konnten nicht geladen werden",
+  "Failed to create administrator": "Administrator konnte nicht erstellt werden"
 }

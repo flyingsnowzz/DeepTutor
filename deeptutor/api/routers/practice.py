@@ -17,7 +17,8 @@ from deeptutor.services.practice.answers import check_answer
 from deeptutor.services.practice.importing import MAX_BYTES, preview
 from deeptutor.services.practice.scheduler import Rating, day_bounds
 from deeptutor.services.practice.storage import PracticeStore, ReviewConflict
-from deeptutor.services.session import get_sqlite_session_store
+from deeptutor.services.session import get_session_store, get_sqlite_session_store
+from deeptutor.services.storage_backend import storage_backend
 
 from .question_notebook import NotebookEntryItem
 
@@ -90,6 +91,14 @@ def _validate_timezone(timezone: str) -> tuple[float, float]:
 
 
 async def _entry(entry_id: int) -> dict:
+    if storage_backend() == "postgres":
+        store = get_session_store()
+        if not await store.practice_visible(entry_id):
+            raise HTTPException(404, "Question not found")
+        entry = await store.get_notebook_entry(entry_id)
+        if entry is None:
+            raise HTTPException(404, "Question not found")
+        return entry
     store = get_sqlite_session_store()
     if not await asyncio.to_thread(PracticeStore(store.db_path).is_visible, entry_id):
         raise HTTPException(404, "Question not found")
@@ -101,8 +110,10 @@ async def _entry(entry_id: int) -> dict:
 
 @router.get("/summary", response_model=PracticeSummary)
 async def summary(timezone: str = "UTC"):
-    store = get_sqlite_session_store()
     try:
+        if storage_backend() == "postgres":
+            return await get_session_store().practice_overview(timezone)
+        store = get_sqlite_session_store()
         return await asyncio.to_thread(PracticeStore(store.db_path).overview, timezone)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
@@ -114,10 +125,14 @@ async def queue(
     category_id: int | None = None,
     limit: int = Query(default=20, ge=1, le=100),
 ):
-    store = get_sqlite_session_store()
-    practice = PracticeStore(store.db_path)
     try:
-        ids = await asyncio.to_thread(practice.queue, timezone, category_id, limit)
+        if storage_backend() == "postgres":
+            store = get_session_store()
+            ids = await store.practice_queue(timezone, category_id, limit)
+        else:
+            store = get_sqlite_session_store()
+            practice = PracticeStore(store.db_path)
+            ids = await asyncio.to_thread(practice.queue, timezone, category_id, limit)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     from deeptutor.services.workspace.context import current_workspace_id
@@ -129,7 +144,9 @@ async def queue(
             questions.append(
                 {
                     "entry": entry,
-                    "state": await asyncio.to_thread(practice.state, entry_id),
+                    "state": (await store.practice_state(entry_id)
+                              if storage_backend() == "postgres" else
+                              await asyncio.to_thread(practice.state, entry_id)),
                     "content_workspace_id": current_workspace_id(),
                 }
             )
@@ -141,8 +158,10 @@ async def practice_analytics(timezone: str = "UTC", days: int = 30):
     _validate_timezone(timezone)
     if days not in {7, 30, 90}:
         raise HTTPException(422, "Days must be 7, 30, or 90")
-    store = get_sqlite_session_store()
     try:
+        if storage_backend() == "postgres":
+            return await get_session_store().practice_analytics(timezone, days)
+        store = get_sqlite_session_store()
         return await asyncio.to_thread(PracticeStore(store.db_path).analytics, timezone, days)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
@@ -151,9 +170,12 @@ async def practice_analytics(timezone: str = "UTC", days: int = 30):
 @router.get("/questions/{entry_id}", response_model=PracticeQuestion)
 async def practice_question(entry_id: int):
     entry = await _entry(entry_id)
-    state = await asyncio.to_thread(
-        PracticeStore(get_sqlite_session_store().db_path).state, entry_id
-    )
+    if storage_backend() == "postgres":
+        state = await get_session_store().practice_state(entry_id)
+    else:
+        state = await asyncio.to_thread(
+            PracticeStore(get_sqlite_session_store().db_path).state, entry_id
+        )
     return {"entry": entry, "state": state}
 
 
@@ -166,6 +188,10 @@ async def check(entry_id: int, payload: AnswerRequest):
 @router.post("/questions/{entry_id}/review")
 async def review(entry_id: int, payload: ReviewRequest):
     try:
+        if storage_backend() == "postgres":
+            return await get_session_store().practice_review(
+                entry_id, payload.request_id, payload.version, payload.rating,
+                payload.answer, self_report=payload.self_report)
         return await asyncio.to_thread(
             PracticeStore(get_sqlite_session_store().db_path).review,
             entry_id,
@@ -261,12 +287,16 @@ async def import_preview(
         await file.close()
     token = None
     if not parsed["errors"]:
-        token = await asyncio.to_thread(
-            PracticeStore(get_sqlite_session_store().db_path).stage_import,
-            file.filename or "",
-            target,
-            parsed["questions"],
-        )
+        if storage_backend() == "postgres":
+            token = await get_session_store().stage_practice_import(
+                file.filename or "", target, parsed["questions"])
+        else:
+            token = await asyncio.to_thread(
+                PracticeStore(get_sqlite_session_store().db_path).stage_import,
+                file.filename or "",
+                target,
+                parsed["questions"],
+            )
     return {
         "token": token,
         "total": len(parsed["questions"]) + len(parsed["errors"]),
@@ -279,6 +309,8 @@ async def import_preview(
 @router.post("/import/commit")
 async def import_commit(payload: CommitRequest):
     try:
+        if storage_backend() == "postgres":
+            return await get_session_store().commit_practice_import(payload.token)
         return await asyncio.to_thread(
             PracticeStore(get_sqlite_session_store().db_path).commit_import, payload.token
         )

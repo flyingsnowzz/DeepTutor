@@ -36,6 +36,63 @@ def _preferences(row):
     return prefs
 
 
+def _postgres_references(paths) -> dict:
+    """Read dependency edges from the current owner's PostgreSQL workspace."""
+    import psycopg
+    from psycopg.rows import dict_row
+
+    from deeptutor.services.postgres.database import database_url
+    from deeptutor.services.storage_backend import postgres_owner_user_id
+
+    owner = postgres_owner_user_id()
+    workspace = getattr(getattr(paths, "scope", None), "workspace_id", "")
+    url = database_url().replace("postgresql+asyncpg://", "postgresql://", 1)
+    with psycopg.connect(url, row_factory=dict_row) as db:
+        db.execute("SELECT set_config('app.user_id', %s, true)", (owner,))
+        sessions = db.execute(
+            """SELECT id FROM sessions WHERE owner_user_id=%s
+               AND COALESCE(preferences_json->>'workspace_id','')=%s""",
+            (owner, workspace),
+        ).fetchall()
+        ids = {row["id"] for row in sessions}
+        bindings = db.execute(
+            """SELECT session_id FROM mastery_path_sessions
+               WHERE owner_user_id=%s""", (owner,)
+        ).fetchall()
+        sources = db.execute(
+            """SELECT kind,external_id FROM mastery_topic_sources
+               WHERE owner_user_id=%s AND path_id IN (
+                   SELECT path_id FROM mastery_path_sessions
+                   WHERE owner_user_id=%s AND session_id=ANY(%s)
+                   UNION
+                   SELECT path_id FROM mastery_paths
+                   WHERE owner_user_id=%s AND owner_session_id=ANY(%s)
+               )""", (owner, owner, list(ids), owner, list(ids))
+        ).fetchall() if ids else []
+        catalog = db.execute(
+            """SELECT state_json FROM reading_catalog_states
+               WHERE owner_user_id=%s AND workspace_id=%s""", (owner, workspace)
+        ).fetchone()
+        messages = db.execute(
+            """SELECT session_id,metadata_json FROM messages
+               WHERE owner_user_id=%s AND session_id=ANY(%s)""", (owner, list(ids))
+        ).fetchall() if ids else []
+        cards = db.execute(
+            """SELECT session_id,card_json FROM assessment_cards
+               WHERE owner_user_id=%s AND session_id=ANY(%s)""", (owner, list(ids))
+        ).fetchall() if ids else []
+    state = (catalog or {}).get("state_json") or {}
+    return {
+        "mastery_sessions": {row["session_id"] for row in bindings} & ids,
+        "mastery_sources": sources,
+        "reading_sessions": {
+            row["session_id"] for row in state.get("reading_workspace_sessions", [])
+        } & ids,
+        "messages": messages,
+        "cards": cards,
+    }
+
+
 def dependency_closure(
     paths,
     sessions: list[dict],
@@ -125,6 +182,9 @@ def _forward_closure(
     if set(features) & {"outputs", "presentations", "attachments"} and session_ids is None:
         ids.update(prefs)
     book_sessions = set()
+    from deeptutor.services.workspace.data_migration import _backend
+
+    pg_refs = _postgres_references(paths) if _backend() == "postgres" else None
     books = []
     for path in paths.get_book_dir().glob("book_*/*.json"):
         if path.name not in {"manifest.json", "inputs.json"}:
@@ -192,8 +252,22 @@ def _forward_closure(
                     ids.update(_question_sessions(paths))
         if "learning" in selected and "learning" not in scanned:
             scanned.add("learning")
+            if pg_refs is not None:
+                ids.update(pg_refs["mastery_sessions"])
+                for row in pg_refs["mastery_sources"]:
+                    kind, external_id = row["kind"], row["external_id"]
+                    if kind == "chat" and external_id in prefs:
+                        ids.add(external_id)
+                    elif kind == "question_bank":
+                        ids.update(_question_sessions(paths))
+                    elif kind in {"book", "notebook"}:
+                        selected.add(kind)
+                    elif kind in {"file", "knowledge_base"}:
+                        selected |= {"files", "knowledge_bases", "parse_cache"}
+                    elif kind == "cowriter":
+                        selected.add("co-writer")
             db = paths.get_workspace_dir() / "learning" / "mastery" / "mastery.sqlite3"
-            if db.exists():
+            if pg_refs is None and db.exists():
                 with closing(sqlite3.connect(db)) as conn, conn:
                     tables = {
                         row[0]
@@ -221,8 +295,10 @@ def _forward_closure(
                                 selected.add("co-writer")
         if "reading" in selected and "reading" not in scanned:
             scanned.add("reading")
+            if pg_refs is not None:
+                ids.update(pg_refs["reading_sessions"])
             db = paths.get_workspace_dir() / "reading" / "_catalog.sqlite3"
-            if db.exists():
+            if pg_refs is None and db.exists():
                 with closing(sqlite3.connect(db)) as conn, conn:
                     if conn.execute(
                         "SELECT 1 FROM sqlite_master WHERE name='reading_workspace_sessions'"
@@ -291,6 +367,28 @@ def _collect_references(value, prefs, ids, selected):
 
 
 def _question_sessions(paths, entry_ids=None) -> set[str]:
+    from deeptutor.services.workspace.data_migration import _backend
+
+    if _backend() == "postgres":
+        import psycopg
+        from deeptutor.services.postgres.database import database_url
+        from deeptutor.services.storage_backend import postgres_owner_user_id
+
+        owner = postgres_owner_user_id()
+        url = database_url().replace("postgresql+asyncpg://", "postgresql://", 1)
+        with psycopg.connect(url) as db:
+            db.execute("SELECT set_config('app.user_id', %s, true)", (owner,))
+            workspace = getattr(getattr(paths, "scope", None), "workspace_id", "")
+            rows = db.execute(
+                """SELECT c.session_id FROM assessment_cards c JOIN sessions s
+                   ON s.id=c.session_id AND s.owner_user_id=c.owner_user_id
+                   WHERE c.owner_user_id=%s
+                     AND COALESCE(s.preferences_json->>'workspace_id','')=%s
+                     AND (%s::text[] IS NULL OR c.id::text=ANY(%s::text[]))""",
+                (owner, workspace, list(map(str, entry_ids)) if entry_ids else None,
+                 list(map(str, entry_ids)) if entry_ids else None),
+            ).fetchall()
+        return {row[0] for row in rows if row[0]}
     db = paths.get_chat_history_db()
     if not db.exists():
         return set()
@@ -350,8 +448,22 @@ def _with_historical_references(
                         into.setdefault(key, child)
                 collect(child, into)
 
+    from deeptutor.services.workspace.data_migration import _backend, _pocketbase_snapshot
+
+    if _backend() == "postgres" and prefs:
+        refs = _postgres_references(paths)
+        for row in refs["messages"]:
+            if row["session_id"] in prefs:
+                collect(row["metadata_json"] or {}, prefs[row["session_id"]])
+        for row in refs["cards"]:
+            sid = row["session_id"]
+            followup = (row["card_json"] or {}).get("followup_session_id")
+            if sid in prefs and followup in prefs:
+                history = prefs[sid].setdefault("history_references", [])
+                if followup not in history:
+                    history.append(followup)
     db = paths.get_chat_history_db()
-    if db.exists():
+    if _backend() != "postgres" and db.exists():
         with closing(sqlite3.connect(db)) as conn, conn:
             for sid, raw in conn.execute("SELECT session_id,metadata_json FROM messages"):
                 if sid in prefs and raw:
@@ -370,8 +482,6 @@ def _with_historical_references(
                     refs = prefs[sid].setdefault("history_references", [])
                     if followup not in refs:
                         refs.append(followup)
-    from deeptutor.services.workspace.data_migration import _backend, _pocketbase_snapshot
-
     if _backend() == "pocketbase" and prefs:
         snapshot = _pocketbase_snapshot(list(prefs))
         for row in snapshot["messages"]:

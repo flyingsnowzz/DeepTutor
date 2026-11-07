@@ -1,5 +1,5 @@
 {
-  "fingerprint": "6d90ec2c45a1d9f3f152c7577772bcdd05ea8b8f2b22a7dcca57e0d09db0097b",
+  "fingerprint": "9243573dadd4ee60a8f4ecee767164029d49e951aa6a2f2223394adb88d5bea2",
   "routers": {
     "deeptutor.api.routers.auth:router": [
       {
@@ -21,6 +21,14 @@
       {
         "path": "/login",
         "name": "login",
+        "kind": "http",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "/admin/login",
+        "name": "admin_login",
         "kind": "http",
         "methods": [
           "POST"
@@ -160,6 +168,22 @@
         "kind": "http",
         "methods": [
           "GET"
+        ]
+      },
+      {
+        "path": "/admin/accounts",
+        "name": "get_admin_accounts",
+        "kind": "http",
+        "methods": [
+          "GET"
+        ]
+      },
+      {
+        "path": "/admin/accounts",
+        "name": "create_admin_account",
+        "kind": "http",
+        "methods": [
+          "POST"
         ]
       },
       {

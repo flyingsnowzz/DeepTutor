@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from deeptutor.capabilities.marginnote4.models import ALL_TYPES
-from deeptutor.capabilities.marginnote4.store import MarginNoteStore
+from deeptutor.capabilities.marginnote4.store import MarginNoteStore, PostgresMarginNoteStore
 from deeptutor.core.tool_protocol import BaseTool, ToolDefinition, ToolParameter, ToolResult
 
 MARGINNOTE_TOOL_NAMES: tuple[str, ...] = (
@@ -33,6 +33,13 @@ MARGINNOTE_TOOL_NAMES: tuple[str, ...] = (
 
 
 def _store(kwargs: dict[str, Any]) -> MarginNoteStore | None:
+    from deeptutor.services.storage_backend import postgres_owner_user_id, storage_backend
+
+    if storage_backend() == "postgres":
+        kb_name = str(kwargs.get("_kb_name") or "").strip()
+        if not kb_name:
+            return None
+        return PostgresMarginNoteStore(postgres_owner_user_id(), kb_name)
     raw = str(kwargs.get("_db_path") or "").strip()
     if not raw:
         return None

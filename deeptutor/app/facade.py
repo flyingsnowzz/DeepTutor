@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from contextlib import contextmanager
 from functools import wraps
 import inspect
 import json
@@ -57,19 +58,45 @@ class CapabilityAvailability:
 class DeepTutorApp:
     """Facade around runtime, session, notebook, and capability contracts."""
 
-    def __init__(self, *, workspace_id: str | None = None) -> None:
+    def __init__(
+        self, *, workspace_id: str | None = None, user_id: str | None = None
+    ) -> None:
         self.workspace_id = workspace_id
+        self.user_id = str(user_id or "").strip() or None
         self._turn_workspaces: dict[str, str] = {}
         self.container = get_application_container()
         self.turns = self.container.turns
         self.capabilities = self.container.capability_registry
 
-    def _workspace_context(self):
+    @contextmanager
+    def _workspace_context(self, workspace_id: str | None = None):
+        from deeptutor.multi_user.context import (
+            get_current_user_or_none, reset_current_user, set_current_user,
+        )
+        from deeptutor.multi_user.models import CurrentUser
+        from deeptutor.multi_user.paths import scope_for_user
         from deeptutor.services.workspace.context import current_workspace_id, workspace_context
 
-        return workspace_context(
-            self.workspace_id if self.workspace_id is not None else current_workspace_id()
-        )
+        token = None
+        current = get_current_user_or_none()
+        if self.user_id is not None:
+            if current is not None and current.id != self.user_id:
+                raise PermissionError("SDK user_id conflicts with the authenticated user")
+            if current is None:
+                token = set_current_user(CurrentUser(
+                    id=self.user_id, username=self.user_id, role="user",
+                    scope=scope_for_user(self.user_id, is_admin=False),
+                ))
+        try:
+            with workspace_context(
+                workspace_id
+                if workspace_id is not None
+                else self.workspace_id if self.workspace_id is not None else current_workspace_id()
+            ) as scope:
+                yield scope
+        finally:
+            if token is not None:
+                reset_current_user(token)
 
     @property
     def notebooks(self):
@@ -133,7 +160,7 @@ class DeepTutorApp:
             request = TurnRequest(**request)
         await self.container.start()
         resolved_capability = self.resolve_capability(request.capability)
-        from deeptutor.services.workspace.context import current_workspace_id, workspace_context
+        from deeptutor.services.workspace.context import current_workspace_id
 
         workspace_id = (
             request.workspace_id
@@ -142,7 +169,7 @@ class DeepTutorApp:
         )
         if workspace_id is None:
             workspace_id = current_workspace_id()
-        with workspace_context(workspace_id):
+        with self._workspace_context(workspace_id):
             result = await self.turns.start_turn(
                 {
                     **request.to_payload(),
@@ -155,9 +182,9 @@ class DeepTutorApp:
 
     async def stream_turn(self, turn_id: str, after_seq: int = 0) -> AsyncIterator[dict[str, Any]]:
         await self.container.start()
-        from deeptutor.services.workspace.context import current_workspace_id, workspace_context
+        from deeptutor.services.workspace.context import current_workspace_id
 
-        with workspace_context(
+        with self._workspace_context(
             self._turn_workspaces.get(
                 turn_id,
                 self.workspace_id if self.workspace_id is not None else current_workspace_id(),
@@ -168,9 +195,9 @@ class DeepTutorApp:
 
     async def cancel_turn(self, turn_id: str) -> bool:
         await self.container.start()
-        from deeptutor.services.workspace.context import current_workspace_id, workspace_context
+        from deeptutor.services.workspace.context import current_workspace_id
 
-        with workspace_context(
+        with self._workspace_context(
             self._turn_workspaces.get(
                 turn_id,
                 self.workspace_id if self.workspace_id is not None else current_workspace_id(),
@@ -187,13 +214,7 @@ class DeepTutorApp:
     ) -> bool:
         """Deliver the user's reply to a turn paused on ``ask_user``."""
         await self.container.start()
-        from deeptutor.services.workspace.context import workspace_context
-
-        with (
-            workspace_context(self._turn_workspaces[turn_id])
-            if turn_id in self._turn_workspaces
-            else self._workspace_context()
-        ):
+        with self._workspace_context(self._turn_workspaces.get(turn_id)):
             return await self.turns.submit_user_reply(turn_id, text=text, answers=answers)
 
     @_in_app_workspace

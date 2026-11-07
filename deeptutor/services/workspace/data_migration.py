@@ -191,6 +191,30 @@ def _sqlite_sessions(paths) -> list[dict]:
 
 
 def _sessions(paths) -> list[dict]:
+    if _backend() == "postgres":
+        import psycopg
+        from psycopg.rows import dict_row
+
+        from deeptutor.services.postgres.database import database_url
+        from deeptutor.services.storage_backend import postgres_owner_user_id
+
+        owner = postgres_owner_user_id()
+        workspace_id = getattr(getattr(paths, "scope", None), "workspace_id", "")
+        url = database_url().replace("postgresql+asyncpg://", "postgresql://", 1)
+        with psycopg.connect(url, row_factory=dict_row) as db:
+            db.execute("SELECT set_config('app.user_id',%s,true)", (owner,))
+            rows = db.execute(
+                """SELECT id,title,preferences_json FROM sessions
+                   WHERE owner_user_id=%s
+                     AND COALESCE(preferences_json->>'workspace_id','')=%s
+                   ORDER BY created_at,id""",
+                (owner, workspace_id),
+            ).fetchall()
+        return [
+            {"id": row["id"], "title": row["title"],
+             "preferences_json": json.dumps(row["preferences_json"] or {})}
+            for row in rows
+        ]
     if _backend() == "pocketbase":
         from deeptutor.services.session.pocketbase_store import (
             _current_user_id,
@@ -274,10 +298,15 @@ def discover(workspace_id: str = "") -> dict:
             "features": rows,
             "historical": legacy,
             "session_backend": _backend(),
+            "transfer_available": _backend() != "postgres",
         }
 
 
 def _backend() -> str:
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        return "postgres"
     from deeptutor.services.pocketbase_client import is_pocketbase_enabled
 
     return "pocketbase" if is_pocketbase_enabled() else "sqlite"
@@ -312,9 +341,19 @@ def _shared_source_blockers(source_id: str, selected: set[str]) -> list[str]:
     return sorted(blockers)
 
 
+def _require_local_data_migration() -> None:
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        raise WorkspaceError(
+            "Workspace bundle migration is unavailable until its PostgreSQL transfer is implemented."
+        )
+
+
 def preview(
     source_id: str, target_id: str, features: list[str], *, session_ids: set[str] | None = None
 ) -> dict:
+    _require_local_data_migration()
     if not features or any(feature not in FEATURES for feature in features):
         raise WorkspaceError("Select at least one supported feature.")
     with workspace_context(source_id):
@@ -439,6 +478,42 @@ def _selected_artifact_files(paths, session_ids: set[str]) -> dict[str, list[str
 
     identifiers = set(session_ids)
     referenced_urls = set()
+    if _backend() == "postgres" and session_ids:
+        import psycopg
+        from psycopg.rows import dict_row
+
+        from deeptutor.services.postgres.database import database_url
+        from deeptutor.services.storage_backend import postgres_owner_user_id
+
+        owner = postgres_owner_user_id()
+        url = database_url().replace("postgresql+asyncpg://", "postgresql://", 1)
+        with psycopg.connect(url, row_factory=dict_row) as pg:
+            pg.execute("SELECT set_config('app.user_id', %s, true)", (owner,))
+            turns = pg.execute(
+                """SELECT id FROM turns WHERE owner_user_id=%s
+                   AND session_id=ANY(%s)""", (owner, list(session_ids))
+            ).fetchall()
+            turn_ids = {row["id"] for row in turns}
+            identifiers.update(turn_ids)
+            messages = pg.execute(
+                """SELECT content,metadata_json,events_json,attachments_json
+                   FROM messages WHERE owner_user_id=%s
+                   AND session_id=ANY(%s)""", (owner, list(session_ids))
+            ).fetchall()
+            events = pg.execute(
+                """SELECT content,metadata_json FROM turn_events
+                   WHERE owner_user_id=%s AND turn_id=ANY(%s)
+                     AND (content LIKE '%%/files/%%'
+                          OR metadata_json::text LIKE '%%/files/%%')""",
+                (owner, list(turn_ids)),
+            ).fetchall() if turn_ids else []
+        for row in [*messages, *events]:
+            referenced_urls.update(
+                re.findall(
+                    r'/files/(?:outputs|workspace-items)/[^\s"\'<>\\)\]]+',
+                    json.dumps(row, ensure_ascii=False),
+                )
+            )
     if _backend() == "pocketbase" and session_ids:
         snapshot = _pocketbase_snapshot(sorted(session_ids))
         identifiers.update(row.get("turn_id", "") for row in snapshot["turns"])
@@ -451,7 +526,7 @@ def _selected_artifact_files(paths, session_ids: set[str]) -> dict[str, list[str
                     )
                 )
     db = paths.get_chat_history_db()
-    if db.exists():
+    if _backend() != "postgres" and db.exists():
         with closing(sqlite3.connect(db)) as conn, conn:
             identifiers.update(
                 row[0]
@@ -509,6 +584,7 @@ def _selected_artifact_files(paths, session_ids: set[str]) -> dict[str, list[str
 
 
 def export_data(source_id: str, features: list[str], *, include_historical: bool = False) -> dict:
+    _require_local_data_migration()
     operation_id = uuid.uuid4().hex
     root = _journal_root() / operation_id
     root.mkdir()
@@ -561,6 +637,7 @@ def export_data(source_id: str, features: list[str], *, include_historical: bool
 def migrate_data(
     source_id: str, target_id: str, features: list[str], *, session_ids: set[str] | None = None
 ) -> dict:
+    _require_local_data_migration()
     from deeptutor.services.workspace.session_transfer import transfer_sessions
 
     with data_activity(exclusive=True):
@@ -1022,6 +1099,7 @@ def assert_no_pending_recovery(*, reject_unreadable: bool = False) -> None:
 
 def recover_operation(operation_id: str) -> dict:
     """Finish committed cleanup, or restore an interrupted precommit transfer."""
+    _require_local_data_migration()
     if len(operation_id) != 32 or any(c not in "0123456789abcdef" for c in operation_id):
         raise WorkspaceError("Migration not found.")
     root = _journal_root() / operation_id

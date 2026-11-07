@@ -7,8 +7,8 @@ to conflate them:
   ``password_hash`` and ``users.json`` is empty. An admin already exists, so
   accounts created from ``/admin/users`` must stay ``role="user"`` and the
   bootstrap admin must keep working after the store gains its first record.
-* **Genuinely empty** — no bootstrap credentials at all. The first account to
-  register is promoted to admin, which is the documented bootstrap path.
+* **Genuinely empty** — no bootstrap credentials at all. The first account
+  stays an ordinary account.
 """
 
 from __future__ import annotations
@@ -79,16 +79,17 @@ def test_env_admin_still_resolves_after_first_account_is_created(env_admin, boot
 
 
 def test_env_admin_can_log_in_after_first_account_is_created(env_admin):
-    """End-to-end shape of the reported lockout: login returned 401."""
+    """Bootstrap credentials remain valid through the administrator entrance."""
     from deeptutor.multi_user.identity import save_user
-    from deeptutor.services.auth import authenticate
+    from deeptutor.services.auth import authenticate_admin
 
     save_user("student1", "$2b$12$placeholder", role="user")
 
-    payload = authenticate(env_admin, _BOOTSTRAP_PASSWORD)
+    payload = authenticate_admin(env_admin, _BOOTSTRAP_PASSWORD)
 
     assert payload is not None
     assert payload.role == "admin"
+    assert payload.is_super_admin is True
 
 
 def test_env_admin_is_never_written_into_the_user_store(env_admin):
@@ -148,16 +149,16 @@ def test_is_first_user_is_false_when_only_the_env_admin_exists(env_admin):
 
 
 # ---------------------------------------------------------------------------
-# No-env-admin path — the documented bootstrap behaviour is preserved
+# No-env-admin path — ordinary account creation stays unprivileged
 # ---------------------------------------------------------------------------
 
 
-def test_first_account_is_promoted_when_no_env_admin_exists(mu_isolated_root):
+def test_first_account_stays_user_when_no_env_admin_exists(mu_isolated_root):
     from deeptutor.multi_user.identity import save_user
 
     record = save_user("alice", "$2b$12$placeholder", role="user")
 
-    assert record["role"] == "admin"
+    assert record["role"] == "user"
 
 
 def test_second_account_is_not_promoted_when_no_env_admin_exists(mu_isolated_root):
@@ -169,13 +170,8 @@ def test_second_account_is_not_promoted_when_no_env_admin_exists(mu_isolated_roo
     assert record["role"] == "user"
 
 
-def test_partial_env_credentials_do_not_count_as_an_admin(mu_isolated_root, monkeypatch):
-    """A username with no hash cannot log in, so it must not block promotion.
-
-    This is the shipped default (``auth.json`` seeds ``username="admin"`` with
-    an empty hash), so treating it as an existing admin would leave a fresh
-    deployment with no way to create one.
-    """
+def test_partial_env_credentials_do_not_promote_users(mu_isolated_root, monkeypatch):
+    """An unconfigured bootstrap hash never elevates ordinary accounts."""
     from deeptutor.multi_user.identity import save_user
     from deeptutor.services import auth as auth_service
 
@@ -184,7 +180,7 @@ def test_partial_env_credentials_do_not_count_as_an_admin(mu_isolated_root, monk
 
     record = save_user("alice", "$2b$12$placeholder", role="user")
 
-    assert record["role"] == "admin"
+    assert record["role"] == "user"
 
 
 def test_is_first_user_is_true_for_a_genuinely_empty_deployment(mu_isolated_root):
@@ -244,7 +240,7 @@ def test_bootstrap_admin_remains_listed_after_creating_an_account(bootstrap_clie
     listed = client.get("/api/auth/users", headers=headers).json()
 
     by_name = {item["username"]: item for item in listed}
-    assert by_name[env_admin]["role"] == "admin"
+    assert env_admin not in by_name
     assert by_name["student1"]["role"] == "user"
 
 

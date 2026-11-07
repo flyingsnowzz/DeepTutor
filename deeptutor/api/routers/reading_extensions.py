@@ -350,14 +350,16 @@ async def _persist_reading_quiz_pending(
     questions = payload.get("questions")
     if not isinstance(questions, list) or not questions:
         return
-    from deeptutor.services.session import get_sqlite_session_store
+    from deeptutor.services.session import get_session_store, get_sqlite_session_store
+    from deeptutor.services.storage_backend import storage_backend
 
     # A regenerated quiz must not reuse q_1 and grade an old card against a new key.
     quiz_id = uuid4().hex
     for index, question in enumerate(questions):
         if isinstance(question, dict):
             question["id"] = f"{quiz_id}:{index}"
-    await get_sqlite_session_store().put_reading_quiz_pending(material_id, locator, questions)
+    store = get_session_store() if storage_backend() == "postgres" else get_sqlite_session_store()
+    await store.put_reading_quiz_pending(material_id, locator, questions)
 
 
 @router.post("/materials/{material_id}/extensions/quiz/answers")
@@ -374,9 +376,10 @@ async def submit_quiz_answers(material_id: str, payload: QuizAnswersPayload) -> 
         is_correct_to_result,
         record_assessment,
     )
-    from deeptutor.services.session import get_sqlite_session_store
+    from deeptutor.services.session import get_session_store, get_sqlite_session_store
+    from deeptutor.services.storage_backend import storage_backend
 
-    store = get_sqlite_session_store()
+    store = get_session_store() if storage_backend() == "postgres" else get_sqlite_session_store()
     question_ids = [item.question_id.strip() for item in payload.answers]
     pending_quiz = await store.get_reading_quiz_pending(material_id, payload.locator)
     pending = {qid: pending_quiz[qid] for qid in question_ids if qid in pending_quiz}
@@ -409,6 +412,10 @@ async def submit_quiz_answers(material_id: str, payload: QuizAnswersPayload) -> 
     origin_type = "conversation" if session_id else "document_analysis"
     origin_ref = session_id or f"reading:{material_id}"
     turn_id = payload.turn_id.strip() or f"reading:{material_id}:loc:{payload.locator}"
+    owner_prefix = ""
+    if storage_backend() == "postgres":
+        from deeptutor.multi_user.context import get_current_user
+        owner_prefix = f"{get_current_user().id}:"
     graded: list[dict[str, Any]] = []
     for item in payload.answers:
         question = pending[item.question_id.strip()]
@@ -426,7 +433,7 @@ async def submit_quiz_answers(material_id: str, payload: QuizAnswersPayload) -> 
         correct_text = str(choices[correct_index]) if 0 <= correct_index < len(choices) else ""
         submission_id = payload.submission_id.strip()
         attempt_id = (
-            f"reading:{origin_type}:{origin_ref}:{turn_id}:"
+            f"{owner_prefix}reading:{origin_type}:{origin_ref}:{turn_id}:"
             f"{item.question_id.strip()}:{submission_id}"
             if submission_id
             else ""
@@ -489,9 +496,11 @@ async def list_quiz_rewards(material_id: str) -> dict[str, Any]:
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
 
-    from deeptutor.services.session import get_sqlite_session_store
+    from deeptutor.services.session import get_session_store, get_sqlite_session_store
+    from deeptutor.services.storage_backend import storage_backend
 
-    rewards = await get_sqlite_session_store().list_reading_quiz_rewards(material_id)
+    store = get_session_store() if storage_backend() == "postgres" else get_sqlite_session_store()
+    rewards = await store.list_reading_quiz_rewards(material_id)
     return {"rewards": rewards, "total_stars": sum(row["stars"] for row in rewards)}
 
 

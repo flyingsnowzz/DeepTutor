@@ -61,10 +61,10 @@ def test_import_reports_rows_and_creates_only_ordinary_users(batch_client):
         item["username"]: item
         for item in client.get("/api/auth/users", headers=headers["admin"]).json()
     }
-    assert set(users) == {"root", "alice", "bob", "carol"}
+    assert set(users) == {"alice", "bob", "carol"}
     assert users["alice"]["preset"] == "learner"
     assert users["carol"]["preset"] == "custom"
-    assert all(item["role"] == "user" for name, item in users.items() if name != "root")
+    assert all(item["role"] == "user" for item in users.values())
 
 
 def test_import_rejects_role_column_and_creates_nothing(batch_client):
@@ -82,7 +82,7 @@ def test_import_rejects_role_column_and_creates_nothing(batch_client):
     usernames = {
         item["username"] for item in client.get("/api/auth/users", headers=headers["admin"]).json()
     }
-    assert usernames == {"root"}
+    assert usernames == set()
 
 
 def test_import_rolls_back_learner_when_grant_initialization_fails(batch_client, monkeypatch):
@@ -113,7 +113,7 @@ def test_import_rolls_back_learner_when_grant_initialization_fails(batch_client,
     usernames = {
         item["username"] for item in client.get("/api/auth/users", headers=headers["admin"]).json()
     }
-    assert usernames == {"root"}
+    assert usernames == set()
 
 
 def test_import_requires_admin(batch_client):
@@ -173,7 +173,7 @@ def test_batch_delete_reports_partial_results_and_protects_current_admin(batch_c
     usernames = {
         item["username"] for item in client.get("/api/auth/users", headers=headers["admin"]).json()
     }
-    assert usernames == {"root"}
+    assert usernames == set()
 
 
 def test_import_accepts_normalized_csv_header_without_losing_row_values(batch_client):

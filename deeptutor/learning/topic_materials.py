@@ -277,9 +277,10 @@ def _run_sync(coro: Any) -> Any:
 
 
 def _session_store() -> Any:
-    from deeptutor.services.session import get_sqlite_session_store
+    from deeptutor.services.session import get_session_store, get_sqlite_session_store
+    from deeptutor.services.storage_backend import storage_backend
 
-    return get_sqlite_session_store()
+    return get_session_store() if storage_backend() == "postgres" else get_sqlite_session_store()
 
 
 def _load_chat_material(source_id: str, label: str, budget: int) -> TopicMaterial:

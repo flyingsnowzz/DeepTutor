@@ -115,6 +115,26 @@ async def lifespan(app: FastAPI):
     logger.info("Application startup")
     app.state.ready = False
 
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        from deeptutor.services.postgres.database import validate_postgres_schema
+
+        await validate_postgres_schema()
+
+    from deeptutor.services.accounts.web_gateway import (
+        get_postgres_web_account_gateway,
+        postgres_accounts_enabled,
+    )
+
+    if postgres_accounts_enabled():
+        from sqlalchemy import text
+
+        gateway = get_postgres_web_account_gateway()
+        async with gateway.engine.connect() as db:
+            await db.execute(text("SELECT 1 FROM first_party_credentials LIMIT 1"))
+            await db.execute(text("SELECT 1 FROM admin_accounts LIMIT 1"))
+
     # Validate configuration consistency
     validate_tool_consistency()
 
@@ -159,9 +179,7 @@ async def lifespan(app: FastAPI):
 
     try:
         if module_enabled("mastery"):
-            from deeptutor.learning.assessment import reconcile_linked_assessments
-
-            recovered, failed = await reconcile_linked_assessments()
+            recovered, failed = await application_container.reconcile_linked_assessments()
             if recovered or failed:
                 logger.info("Linked assessment recovery: recovered=%s failed=%s", recovered, failed)
     except Exception:
@@ -315,6 +333,10 @@ async def lifespan(app: FastAPI):
 
     try:
         await application_container.close()
+        if postgres_accounts_enabled():
+            from deeptutor.services.accounts.web_gateway import close_postgres_web_account_gateway
+
+            await close_postgres_web_account_gateway()
         logger.info("Application container closed")
     except Exception as e:
         logger.warning(f"Failed to close application container: {e}")

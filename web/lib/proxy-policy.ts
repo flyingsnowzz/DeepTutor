@@ -53,6 +53,7 @@ const STATIC_ASSET =
 export function isAuthExempt(pathname: string): boolean {
   return (
     pathname.startsWith(LOGIN_PATH) ||
+    pathname === "/admin/login" ||
     pathname.startsWith("/register") ||
     pathname === HANDOFF_PATH ||
     pathname.startsWith("/_next") ||

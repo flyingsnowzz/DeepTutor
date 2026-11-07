@@ -16,10 +16,25 @@ def learning_policy_for_user(user_id: str, *, is_admin: bool = False) -> dict[st
     loaded = load_grant(user_id)
     policy = loaded.get("learning_policy")
     if policy is None:
-        from .identity import get_user_by_id
+        from deeptutor.services.storage_backend import storage_backend
 
-        user = get_user_by_id(user_id)
-        if user is not None and str(user[1].get("preset") or "standard") == "learner":
+        if storage_backend() == "postgres":
+            import psycopg
+
+            from deeptutor.services.postgres.database import authentication_database_url
+
+            url = authentication_database_url().replace("postgresql+asyncpg://", "postgresql://", 1)
+            with psycopg.connect(url) as db:
+                row = db.execute(
+                    "SELECT preset FROM users WHERE id=%s AND is_active=true", (user_id,)
+                ).fetchone()
+            preset = str(row[0]) if row else "standard"
+        else:
+            from .identity import get_user_by_id
+
+            user = get_user_by_id(user_id)
+            preset = str(user[1].get("preset") or "standard") if user is not None else "standard"
+        if preset == "learner":
             from .grants import learner_grant
 
             policy = learner_grant(user_id).get("learning_policy")

@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 from hashlib import sha1
 import logging
+import os
 import time
 from typing import Any
 
@@ -298,6 +299,19 @@ def _get_learning_store():
     return LearningStore()
 
 
+def _assessment_store():
+    from deeptutor.services.session import get_session_store, get_sqlite_session_store
+
+    if os.environ.get("DEEPTUTOR_STORAGE_BACKEND", "local").strip().lower() == "postgres":
+        store = get_session_store()
+        from deeptutor.services.session.postgres_scoped import PostgresScopedSessionStore
+
+        if not isinstance(store, PostgresScopedSessionStore):
+            raise RuntimeError("PostgreSQL storage mode requires a PostgreSQL session store")
+        return store
+    return get_sqlite_session_store()
+
+
 def _apply_linked_retention(
     record: AssessmentRecord,
     *,
@@ -429,9 +443,7 @@ async def record_assessment(record: AssessmentRecord) -> AssessmentOutcome:
     item = to_notebook_item(record, diagnostics)
     attempt_id = record.attempt_identity
     try:
-        from deeptutor.services.session import get_sqlite_session_store
-
-        store = get_sqlite_session_store()
+        store = _assessment_store()
         existing_attempt = await store.get_assessment_attempt(attempt_id)
         if existing_attempt is not None:
             # An earlier submission may have had an untrusted mapping removed.
@@ -511,9 +523,7 @@ async def record_assessment(record: AssessmentRecord) -> AssessmentOutcome:
 
 async def reconcile_linked_assessments() -> tuple[int, int]:
     """Replay durable cross-surface attempts left pending by an interrupted run."""
-    from deeptutor.services.session import get_sqlite_session_store
-
-    store = get_sqlite_session_store()
+    store = _assessment_store()
     attempts = await store.pending_linked_assessments()
     recovered = 0
     failed = 0

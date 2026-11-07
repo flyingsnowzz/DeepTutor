@@ -129,6 +129,12 @@ class ApplicationContainer:
         lease.__enter__()
         self._module_lease = lease
         try:
+            from deeptutor.services.storage_backend import storage_backend
+
+            if storage_backend() == "postgres":
+                from deeptutor.services.postgres.database import validate_postgres_schema
+
+                await validate_postgres_schema()
             if not await self.coordinator.health():
                 raise RuntimeConfigurationError(
                     "Turn coordination backend is unavailable; refusing to start"
@@ -145,6 +151,9 @@ class ApplicationContainer:
         try:
             # Await cancellation cleanup before releasing the environment lease.
             await self.runtime_registry.close(drain_timeout_seconds=0.0)
+            from deeptutor.services.session import close_postgres_session_stores
+
+            await close_postgres_session_stores()
             from deeptutor.runtime.memory_reclaim import cancel_idle_reclaim
             from deeptutor.runtime.ts_engine import close_engine_clients
 
@@ -172,7 +181,7 @@ class ApplicationContainer:
         from deeptutor.services.workspace.models import WorkspaceError
 
         seen: set[str] = set()
-        for user in self._local_users():
+        for user in await self._runtime_users():
             with user_context(user):
                 try:
                     activity = acquire_activity()
@@ -232,6 +241,67 @@ class ApplicationContainer:
                 )
             )
         return users
+
+    async def _runtime_users(self) -> list[Any]:
+        from deeptutor.services.storage_backend import storage_backend
+
+        if storage_backend() != "postgres":
+            return self._local_users()
+
+        from deeptutor.multi_user.models import CurrentUser
+        from deeptutor.multi_user.paths import scope_for_user
+        from deeptutor.services.accounts.web_gateway import get_postgres_web_account_gateway
+        from sqlalchemy import text
+
+        users: list[Any] = []
+        gateway = get_postgres_web_account_gateway()
+        accounts = gateway.users
+        offset = 0
+        while True:
+            batch = await accounts.list_users(limit=500, offset=offset)
+            users.extend(
+                CurrentUser(
+                    id=str(row["id"]),
+                    username=str(row["username"]),
+                    role="user",
+                    scope=scope_for_user(str(row["id"]), is_admin=False),
+                )
+                for row in batch if row.get("is_active")
+            )
+            if len(batch) < 500:
+                break
+            offset += len(batch)
+        # Offline SQLite imports have an owner row but no first-party login
+        # credential yet. Their pending turns still need startup recovery.
+        seen = {user.id for user in users}
+        async with gateway.engine.connect() as db:
+            legacy_rows = (await db.execute(text(
+                "SELECT id,COALESCE(username,id) AS username FROM users "
+                "WHERE left(id,7)='legacy_' AND is_active=true AND role='user'"
+            ))).mappings().all()
+        users.extend(
+            CurrentUser(
+                id=str(row["id"]), username=str(row["username"]), role="user",
+                scope=scope_for_user(str(row["id"]), is_admin=False),
+            )
+            for row in legacy_rows if row["id"] not in seen
+        )
+        return users
+
+    async def reconcile_linked_assessments(self) -> tuple[int, int]:
+        from deeptutor.learning.assessment import reconcile_linked_assessments
+        from deeptutor.multi_user.paths import user_context
+        from deeptutor.services.storage_backend import storage_backend
+
+        if storage_backend() != "postgres":
+            return await reconcile_linked_assessments()
+        recovered = failed = 0
+        for user in await self._runtime_users():
+            with user_context(user):
+                user_recovered, user_failed = await reconcile_linked_assessments()
+                recovered += user_recovered
+                failed += user_failed
+        return recovered, failed
 
     async def migrate_legacy_chat(self, *, dry_run: bool = False) -> dict[str, Any]:
         """Migrate the current scope's removed v1 JSON chat store."""
@@ -345,6 +415,15 @@ class ApplicationContainer:
 
     async def run_startup_data_migrations(self) -> dict[str, list[dict[str, Any]]]:
         """Run every idempotent migration shared by all server launch modes."""
+
+        from deeptutor.services.storage_backend import storage_backend
+
+        if storage_backend() == "postgres":
+            # SQLite V1 chat and workspace adoption are offline ETL inputs.
+            # Running them here would read local user trees under an admin
+            # context and could silently reintroduce local data after cutover.
+            return {"legacy_chat": [], "workspace_preferences": [],
+                    "book_chats": [], "workspace_data": []}
 
         result = {
             "legacy_chat": await self.migrate_all_legacy_chats(),

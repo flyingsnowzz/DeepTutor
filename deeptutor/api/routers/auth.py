@@ -73,18 +73,24 @@ from deeptutor.services.auth import (
     TokenPayload,
     add_user,
     authenticate,
+    authenticate_admin,
     authenticate_device,
     authenticate_pb,
     create_token,
     decode_token,
     delete_user,
     get_user_info,
+    hash_password,
     is_first_user,
     list_users,
     register_pb,
     set_avatar,
     set_learner_profile,
     set_role,
+)
+from deeptutor.services.accounts.web_gateway import (
+    get_postgres_web_account_gateway,
+    postgres_accounts_enabled,
 )
 from deeptutor.services.auth import (
     get_learner_profile as load_learner_profile,
@@ -313,6 +319,7 @@ class AuthStatusResponse(BaseModel):
     username: str | None = None
     role: str | None = None
     is_admin: bool = False
+    is_super_admin: bool = False
     avatar: str = ""
     preset: AccountPreset | None = None
     learning_policy: dict | None = None
@@ -391,6 +398,12 @@ def _extract_token(authorization: str | None, dt_token: str | None) -> str | Non
     return _bearer_token_from_header(authorization) or dt_token
 
 
+async def _decode_account_token(token: str | None) -> TokenPayload | None:
+    if postgres_accounts_enabled():
+        return await get_postgres_web_account_gateway().decode_token(token)
+    return decode_token(token) if token else None
+
+
 # ---------------------------------------------------------------------------
 # Dependencies — reusable auth guards for other routers
 # ---------------------------------------------------------------------------
@@ -457,7 +470,7 @@ async def require_auth(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    payload = decode_token(token)
+    payload = await _decode_account_token(token)
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -476,6 +489,39 @@ def _install_request_workspace(request) -> None:
 
     headers = getattr(request, "headers", {})
     params = getattr(request, "query_params", {})
+    if postgres_accounts_enabled():
+        path = getattr(getattr(request, "url", None), "path", "")
+        method = getattr(request, "method", "GET")
+        allowed = {
+            ("GET", "/api/auth/profile"),
+            ("PUT", "/api/auth/profile"),
+            ("PUT", "/api/auth/profile/avatar"),
+            ("DELETE", "/api/auth/profile/avatar"),
+            ("GET", "/api/auth/profile/learner-profile"),
+            ("PUT", "/api/auth/profile/learner-profile"),
+            ("GET", "/api/auth/users"),
+            ("POST", "/api/auth/users"),
+            ("GET", "/api/auth/admin/accounts"),
+            ("POST", "/api/auth/admin/accounts"),
+            ("POST", "/api/auth/users/batch-delete"),
+            ("POST", "/api/auth/users/import"),
+            ("GET", "/api/auth/devices"),
+            ("POST", "/api/auth/devices"),
+            ("POST", "/api/auth/device/heartbeat"),
+        }
+        avatar_read = method == "GET" and path.startswith("/api/auth/avatar/")
+        user_detail = path.startswith("/api/auth/users/") and (
+            (method == "GET" and path.endswith("/learner-profile"))
+            or (method == "PUT" and path.endswith("/learner-profile"))
+            or (method == "PUT" and path.endswith("/role"))
+            or method == "DELETE"
+        )
+        device_delete = method == "DELETE" and path.startswith("/api/auth/devices/")
+        if path.startswith("/api/auth/") and (method, path) not in allowed and not avatar_read and not user_detail and not device_delete:
+            raise HTTPException(
+                status_code=501,
+                detail="This account operation is not available with PostgreSQL accounts yet.",
+            )
     header = headers.get("x-deeptutor-workspace")
     query = params.get("dt_workspace")
     if header is not None and query is not None and header != query:
@@ -570,7 +616,7 @@ async def ws_require_auth(ws: WebSocket) -> _CtxToken | _WsAuthFailed:
     payload = None
     if AUTH_ENABLED:
         token = ws.query_params.get("token") or ws.cookies.get(_COOKIE_NAME)
-        payload = decode_token(token) if token else None
+        payload = await _decode_account_token(token)
         if not payload:
             await ws.close(code=4001)
             return ws_auth_failed
@@ -605,6 +651,15 @@ async def require_admin(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required",
         )
+    return payload
+
+
+async def require_super_admin(
+    payload: TokenPayload = Depends(require_admin),
+) -> TokenPayload:
+    """Only the configured deployment administrator may manage admins."""
+    if not payload.is_super_admin:
+        raise HTTPException(status_code=403, detail="Super administrator access required")
     return payload
 
 
@@ -830,12 +885,16 @@ async def auth_status(
         )
 
     token = _extract_token(authorization, dt_token)
-    payload = decode_token(token) if token else None
+    payload = await _decode_account_token(token)
     avatar = ""
     preset: AccountPreset | None = None
     learning_policy = None
     if payload is not None:
-        info = get_user_info(payload.username)
+        info = (
+            await get_postgres_web_account_gateway().users.get_user(payload.user_id)
+            if postgres_accounts_enabled() and payload.role == "user"
+            else get_user_info(payload.username) if not postgres_accounts_enabled() else None
+        )
         if info:
             avatar = str(info.get("avatar") or "")
             raw_preset = str(info.get("preset") or "standard")
@@ -845,10 +904,13 @@ async def auth_status(
                 preset = "custom"
             else:
                 preset = "standard"
-        learning_policy = learning_policy_for_user(
-            payload.user_id,
-            is_admin=payload.role == "admin",
-        )
+        from deeptutor.multi_user.paths import user_context
+
+        with user_context(user_from_token_payload(payload)):
+            learning_policy = learning_policy_for_user(
+                payload.user_id,
+                is_admin=payload.role == "admin",
+            )
         # Guardians may attach a policy to a standard or custom account. That
         # policy, not the stored label, is what the runtime must enforce and
         # what clients need to render the scoped experience.
@@ -861,6 +923,7 @@ async def auth_status(
         username=payload.username if payload else None,
         role=payload.role if payload else None,
         is_admin=payload.role == "admin" if payload else False,
+        is_super_admin=payload.is_super_admin if payload else False,
         avatar=avatar,
         preset=preset,
         learning_policy=learning_policy,
@@ -869,12 +932,26 @@ async def auth_status(
 
 @router.post("/login")
 async def login(body: LoginRequest, request: Request, response: Response) -> dict:
-    """Validate credentials and set a JWT cookie."""
+    """Validate ordinary user credentials and set a JWT cookie."""
     if not AUTH_ENABLED:
         return {"ok": True, "message": "Auth is disabled — no login required."}
 
     _require_private_frontend(request)
     _no_store(response)
+
+    if postgres_accounts_enabled():
+        gateway = get_postgres_web_account_gateway()
+        result = await gateway.users.authenticate(body.username, body.password)
+        if result is None:
+            raise HTTPException(status_code=401, detail="Incorrect username or password")
+        response.set_cookie(
+            value=gateway.issue_user_token(result), max_age=_COOKIE_MAX_AGE,
+            **_cookie_attrs(),
+        )
+        return {
+            "ok": True, "user_id": result["id"], "username": result["username"],
+            "role": result["role"], "is_admin": False,
+        }
 
     if POCKETBASE_ENABLED:
         # PocketBase mode: email = username field for backwards-compat with the
@@ -917,6 +994,45 @@ async def login(body: LoginRequest, request: Request, response: Response) -> dic
     }
 
 
+@router.post("/admin/login")
+async def admin_login(body: LoginRequest, request: Request, response: Response) -> dict:
+    """Authenticate administrators through their separate account entrance."""
+    if not AUTH_ENABLED or POCKETBASE_ENABLED:
+        raise HTTPException(status_code=400, detail="Administrator login is unavailable.")
+    _require_private_frontend(request)
+    _no_store(response)
+    if postgres_accounts_enabled():
+        gateway = get_postgres_web_account_gateway()
+        await gateway.ensure_bootstrap_admin()
+        admin = await gateway.admins.authenticate(body.username, body.password)
+        if admin is None:
+            raise HTTPException(status_code=401, detail="Incorrect username or password")
+        response.set_cookie(
+            value=gateway.issue_admin_token(admin), max_age=_COOKIE_MAX_AGE,
+            **_cookie_attrs(),
+        )
+        return {
+            "ok": True, "user_id": admin["id"], "username": admin["username"],
+            "role": "admin", "is_admin": True,
+            "is_super_admin": admin["is_superadmin"],
+        }
+    result = authenticate_admin(body.username, body.password)
+    if result is None:
+        raise HTTPException(status_code=401, detail="Incorrect username or password")
+    token = create_token(
+        result.username, "admin", result.user_id, account_kind=result.account_kind
+    )
+    response.set_cookie(value=token, max_age=_COOKIE_MAX_AGE, **_cookie_attrs())
+    return {
+        "ok": True,
+        "user_id": result.user_id,
+        "username": result.username,
+        "role": "admin",
+        "is_admin": True,
+        "is_super_admin": result.is_super_admin,
+    }
+
+
 def _require_builtin_device_auth() -> None:
     if not AUTH_ENABLED:
         raise HTTPException(
@@ -942,13 +1058,22 @@ async def device_login(body: DeviceLoginRequest, response: Response) -> dict:
             detail="Incorrect device credentials",
         )
 
-    token = create_token(
-        payload.username,
-        payload.role,
-        payload.user_id,
-        device_credential_id=payload.device_credential_id,
-        device_session_nonce=payload.device_session_nonce,
-    )
+    if postgres_accounts_enabled():
+        account = await get_postgres_web_account_gateway().users.get_user(payload.user_id)
+        if account is None:
+            raise HTTPException(status_code=401, detail="Incorrect device credentials")
+        token = get_postgres_web_account_gateway().issue_user_token(
+            account, device_credential_id=payload.device_credential_id,
+            device_session_nonce=payload.device_session_nonce,
+        )
+    else:
+        token = create_token(
+            payload.username,
+            payload.role,
+            payload.user_id,
+            device_credential_id=payload.device_credential_id,
+            device_session_nonce=payload.device_session_nonce,
+        )
     response.set_cookie(value=token, max_age=_COOKIE_MAX_AGE, **_cookie_attrs())
     logger.info(f"User '{payload.username}' logged in with a device credential")
     return {
@@ -1045,6 +1170,8 @@ async def exchange_session_handoff(
     response: Response,
 ) -> dict:
     """Consume a pairing code and return a short-lived ticket in the response body."""
+    if postgres_accounts_enabled():
+        raise HTTPException(status_code=501, detail="Session handoff is not available yet")
 
     _no_store(response)
     host = _request_frontend_host(request)
@@ -1079,6 +1206,8 @@ async def complete_session_handoff(
     response: Response,
 ) -> dict:
     """Consume a ticket once and issue the normal HttpOnly session cookie."""
+    if postgres_accounts_enabled():
+        raise HTTPException(status_code=501, detail="Session handoff is not available yet")
 
     _no_store(response)
     host = _request_frontend_host(request)
@@ -1178,84 +1307,62 @@ async def logout(response: Response) -> dict:
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(body: RegisterRequest, request: Request, response: Response) -> dict:
-    """
-    Bootstrap-only registration.
-
-    Public endpoint that creates the *first* admin account when the user store
-    is empty. Once an admin exists, this endpoint is closed; further accounts
-    must be created by an admin via ``POST /api/auth/users``.
-
-    Only available when AUTH_ENABLED=true.
-    """
+    """Public registration for ordinary accounts when authentication is enabled."""
     if not AUTH_ENABLED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Auth is disabled — registration is not available.",
         )
 
-    _require_private_frontend(request)
     _no_store(response)
 
-    if POCKETBASE_ENABLED:
-        # PocketBase deployments are documented as single-user. Keep registration
-        # closed and require admins to provision users in the PocketBase admin UI.
-        if not is_first_user():
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Self-registration is closed. Ask an administrator to create your account.",
+    if postgres_accounts_enabled():
+        from deeptutor.services.accounts.first_party import AccountExistsError
+
+        try:
+            user_id = await get_postgres_web_account_gateway().users.register(
+                body.username, body.password
             )
-        result = register_pb(username=body.username, email=body.username, password=body.password)
-        if not result:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Registration failed — username or email may already be taken.",
-            )
-        logger.info(f"First user registered via PocketBase: '{body.username}'")
+        except AccountExistsError as exc:
+            raise HTTPException(status_code=409, detail="Username already taken") from exc
         return {
-            "ok": True,
-            "user_id": result.get("id", ""),
-            "username": body.username,
-            "role": "user",
-            "is_first_user": True,
-            "is_admin": False,
+            "ok": True, "user_id": user_id, "username": body.username,
+            "role": "user", "is_admin": False,
         }
 
-    # Standard mode — only allowed before the first admin exists.
-    if not is_first_user():
+    if POCKETBASE_ENABLED:
+        # PocketBase is currently single-user and cannot enforce local roles or
+        # owner-scoped session isolation. Do not expose public registration there.
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Self-registration is closed. Ask an administrator to create your account.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Public registration requires the built-in multi-user backend.",
         )
 
-    existing = {u["username"] for u in list_users()}
-    if body.username in existing:
+    from deeptutor.multi_user.identity import register_public_user
+
+    record = register_public_user(body.username, hash_password(body.password))
+    if record is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Username already taken",
         )
-
-    add_user(body.username, body.password)
-    user_id = ""
-    role = "user"
-    for item in list_users():
-        if item.get("username") == body.username:
-            user_id = str(item.get("id") or "")
-            role = str(item.get("role") or "user")
-            break
-    logger.info(f"First user (admin) registered: '{body.username}'")
+    logger.info("User '%s' registered", body.username)
     return {
         "ok": True,
-        "user_id": user_id,
+        "user_id": record["id"],
         "username": body.username,
-        "role": role,
-        "is_first_user": True,
-        "is_admin": role == "admin",
+        "role": "user",
+        "is_admin": False,
     }
 
 
 @router.get("/is_first_user")
 async def check_is_first_user() -> dict:
     """Return whether the user store is empty (used by the register UI)."""
+    if AUTH_ENABLED and postgres_accounts_enabled():
+        return {"is_first_user": not bool(
+            await get_postgres_web_account_gateway().users.list_users(limit=1)
+        )}
     return {"is_first_user": is_first_user() if AUTH_ENABLED else False}
 
 
@@ -1300,6 +1407,20 @@ async def get_profile(
 ) -> UserInfo:
     """Return the current user's own account info."""
     current = _require_profile_identity(payload)
+    if postgres_accounts_enabled() and current.role == "admin":
+        return UserInfo(
+            id=current.user_id, username=current.username,
+            role="admin", created_at="",
+        )
+    if postgres_accounts_enabled() and current.role != "admin":
+        row = await get_postgres_web_account_gateway().users.get_user(current.user_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        return UserInfo(
+            id=row["id"], username=row["username"], role=row["role"],
+            created_at=row["created_at"].isoformat(),
+            avatar=row["avatar"], preset=row["preset"],
+        )
     info = get_user_info(current.username)
     if info is None:
         # PocketBase-backed identities have no local record; fall back to the
@@ -1324,7 +1445,14 @@ async def update_profile(
     accepted here; ``img:`` markers are owned by the upload endpoint.
     """
     current = _require_profile_identity(payload)
-    if not set_avatar(current.username, body.avatar):
+    if postgres_accounts_enabled() and current.role == "admin":
+        raise HTTPException(status_code=501, detail="Administrator avatar is not available yet")
+    changed = (
+        await get_postgres_web_account_gateway().users.set_avatar(current.user_id, body.avatar)
+        if postgres_accounts_enabled() and current.role != "admin"
+        else set_avatar(current.username, body.avatar)
+    )
+    if not changed:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     # The marker no longer references an uploaded image, so drop the file.
     from deeptutor.multi_user.identity import delete_avatar_file
@@ -1346,6 +1474,8 @@ async def upload_avatar(
     in PocketBase mode (those identities have no local user record).
     """
     current = _require_profile_identity(payload)
+    if postgres_accounts_enabled() and current.role == "admin":
+        raise HTTPException(status_code=501, detail="Administrator avatar is not available yet")
     if POCKETBASE_ENABLED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1356,7 +1486,10 @@ async def upload_avatar(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot store an avatar for this account.",
         )
-    info = get_user_info(current.username)
+    info = (
+        await get_postgres_web_account_gateway().users.get_user(current.user_id)
+        if postgres_accounts_enabled() else get_user_info(current.username)
+    )
     if info is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
@@ -1386,7 +1519,11 @@ async def upload_avatar(
     marker = f"img:{version}"
 
     save_avatar_file(current.user_id, data, ext)
-    if not set_avatar(current.username, marker):
+    changed = (
+        await get_postgres_web_account_gateway().users.set_avatar(current.user_id, marker)
+        if postgres_accounts_enabled() else set_avatar(current.username, marker)
+    )
+    if not changed:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     logger.info(f"User '{current.username}' uploaded a new avatar ({ext}, {len(data)} bytes)")
     return {"ok": True, "avatar": marker}
@@ -1398,11 +1535,16 @@ async def remove_avatar(
 ) -> dict:
     """Remove the current user's uploaded avatar image and reset the marker."""
     current = _require_profile_identity(payload)
+    if postgres_accounts_enabled() and current.role == "admin":
+        raise HTTPException(status_code=501, detail="Administrator avatar is not available yet")
     from deeptutor.multi_user.identity import delete_avatar_file
 
     if current.user_id and _USER_ID_RE.match(current.user_id):
         delete_avatar_file(current.user_id)
-    set_avatar(current.username, "")
+    if postgres_accounts_enabled():
+        await get_postgres_web_account_gateway().users.set_avatar(current.user_id, "")
+    else:
+        set_avatar(current.username, "")
     return {"ok": True, "avatar": ""}
 
 
@@ -1447,7 +1589,11 @@ async def list_devices(
 
     _require_builtin_device_auth()
     credentials = list_device_credentials(user_id=user_id, include_revoked=include_revoked)
-    users = {str(user.get("id") or ""): str(user.get("username") or "") for user in list_users()}
+    records = (
+        await get_postgres_web_account_gateway().users.list_users(limit=500)
+        if postgres_accounts_enabled() else list_users()
+    )
+    users = {str(user.get("id") or ""): str(user.get("username") or "") for user in records}
     return {
         "devices": [
             {**device, "username": users.get(device["user_id"], "")} for device in credentials
@@ -1463,7 +1609,11 @@ async def issue_device(
     """Issue a revocable device credential for an ordinary local account."""
 
     _require_builtin_device_auth()
-    if get_user_by_id(body.user_id) is None:
+    target = (
+        await get_postgres_web_account_gateway().users.get_user(body.user_id)
+        if postgres_accounts_enabled() else get_user_by_id(body.user_id)
+    )
+    if target is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     try:
         device, pairing_code, pin = issue_device_credential(
@@ -1520,8 +1670,81 @@ async def revoke_device(
 
 @router.get("/users", response_model=list[UserInfo])
 async def get_users(_: TokenPayload = Depends(require_admin)) -> list[UserInfo]:
-    """List all registered users. Requires admin role."""
-    return [UserInfo(**u) for u in list_users()]
+    """List learner accounts; administrator accounts have their own endpoint."""
+    if postgres_accounts_enabled():
+        records = await get_postgres_web_account_gateway().users.list_users(limit=500)
+        return [
+            UserInfo(
+                id=row["id"], username=row["username"], role=row["role"],
+                created_at=row["created_at"].isoformat(),
+                disabled=not row["is_active"],
+                avatar=row["avatar"], preset=row["preset"],
+            )
+            for row in records if row["is_active"]
+        ]
+    return [UserInfo(**u) for u in list_users() if u.get("role") != "admin"]
+
+
+@router.get("/admin/accounts")
+async def get_admin_accounts(_: TokenPayload = Depends(require_super_admin)) -> dict:
+    if postgres_accounts_enabled():
+        records = await get_postgres_web_account_gateway().admins.list_admins()
+        return {"administrators": [
+            {
+                "id": row["id"], "username": row["username"], "role": "admin",
+                "super_admin": row["is_superadmin"],
+                "created_at": row["created_at"].isoformat(),
+                "disabled": not row["is_active"],
+            }
+            for row in records
+        ]}
+    from deeptutor.multi_user.admin_identity import list_admins
+
+    return {"administrators": list_admins()}
+
+
+@router.post("/admin/accounts", status_code=status.HTTP_201_CREATED)
+async def create_admin_account(
+    body: RegisterRequest,
+    current: TokenPayload = Depends(require_super_admin),
+) -> dict:
+    if postgres_accounts_enabled():
+        from sqlalchemy.exc import IntegrityError
+
+        try:
+            admin_id = await get_postgres_web_account_gateway().admins.create_admin(
+                current.user_id, body.username, hash_password(body.password)
+            )
+        except IntegrityError as exc:
+            raise HTTPException(status_code=409, detail="Username already taken") from exc
+        log_admin_action(
+            "administrator_create", target_user_id=admin_id,
+            summary={"username": body.username},
+        )
+        return {
+            "ok": True, "user_id": admin_id, "username": body.username,
+            "role": "admin", "is_super_admin": False,
+        }
+    from deeptutor.multi_user.admin_identity import create_admin
+
+    if POCKETBASE_ENABLED:
+        raise HTTPException(status_code=400, detail="Administrator accounts require local auth")
+    record = create_admin(body.username, hash_password(body.password))
+    if record is None:
+        raise HTTPException(status_code=409, detail="Username already taken")
+    log_admin_action(
+        "administrator_create",
+        target_user_id=str(record["id"]),
+        summary={"username": body.username},
+    )
+    logger.info("Super administrator '%s' created admin '%s'", current.username, body.username)
+    return {
+        "ok": True,
+        "user_id": record["id"],
+        "username": body.username,
+        "role": "admin",
+        "is_super_admin": False,
+    }
 
 
 def _require_local_learner(current: TokenPayload) -> tuple[str, dict]:
@@ -1544,6 +1767,11 @@ def _require_local_learner(current: TokenPayload) -> tuple[str, dict]:
 @router.get("/profile/learner-profile")
 async def get_current_learner_profile(current: TokenPayload = Depends(require_auth)) -> dict:
     """Return the authenticated learner's own profile."""
+    if postgres_accounts_enabled():
+        user = await get_postgres_web_account_gateway().users.get_user(current.user_id)
+        if user is None or user["preset"] != "learner":
+            raise HTTPException(status_code=403, detail="Learner profile required")
+        return {"learner_profile": user["learner_profile_json"]}
     _require_local_learner(current)
     profile = load_learner_profile(current.username)
     return {"learner_profile": profile}
@@ -1555,7 +1783,8 @@ async def put_current_learner_profile(
     current: TokenPayload = Depends(require_auth),
 ) -> dict:
     """Update only the authenticated learner's own profile."""
-    _require_local_learner(current)
+    if not postgres_accounts_enabled():
+        _require_local_learner(current)
     from deeptutor.multi_user.learner_profile import normalize_profile
 
     try:
@@ -1564,6 +1793,12 @@ async def put_current_learner_profile(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
+    if postgres_accounts_enabled():
+        if not await get_postgres_web_account_gateway().users.set_learner_profile(
+            current.user_id, profile
+        ):
+            raise HTTPException(status_code=403, detail="Learner profile required")
+        return {"learner_profile": profile}
     updated = set_learner_profile(current.username, profile)
     log_usage(
         "learner_profile",
@@ -1577,6 +1812,11 @@ async def put_current_learner_profile(
 @router.get("/users/{username}/learner-profile")
 async def get_learner_profile(username: str, _: TokenPayload = Depends(require_admin)) -> dict:
     """Return the structured profile managed for an ordinary learner."""
+    if postgres_accounts_enabled():
+        user = await get_postgres_web_account_gateway().users.get_user_by_username(username)
+        if user is None or user["preset"] != "learner":
+            raise HTTPException(status_code=404, detail="User not found")
+        return {"learner_profile": user["learner_profile_json"]}
     from deeptutor.multi_user.identity import get_user
 
     user = get_user(username)
@@ -1595,6 +1835,18 @@ async def put_learner_profile(
     body: LearnerProfileRequest,
     current: TokenPayload = Depends(require_admin),
 ) -> dict:
+    if postgres_accounts_enabled():
+        from deeptutor.multi_user.learner_profile import normalize_profile
+
+        user = await get_postgres_web_account_gateway().users.get_user_by_username(username)
+        if user is None or user["preset"] != "learner":
+            raise HTTPException(status_code=404, detail="User not found")
+        try:
+            profile = normalize_profile(body.model_dump(exclude_none=True))
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        await get_postgres_web_account_gateway().users.set_learner_profile(user["id"], profile)
+        return {"learner_profile": profile}
     from deeptutor.multi_user.identity import get_user
     from deeptutor.multi_user.learner_profile import normalize_profile
 
@@ -1729,6 +1981,23 @@ async def admin_create_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Auth is disabled — user creation is not available.",
         )
+    if postgres_accounts_enabled():
+        from deeptutor.services.accounts.first_party import AccountExistsError
+
+        try:
+            user_id = await get_postgres_web_account_gateway().users.register(
+                body.username, body.password, preset=body.preset
+            )
+        except AccountExistsError as exc:
+            raise HTTPException(status_code=409, detail="Username already taken") from exc
+        log_admin_action(
+            "user_create", target_user_id=user_id,
+            summary={"username": body.username, "preset": body.preset},
+        )
+        return {
+            "ok": True, "user_id": user_id, "username": body.username,
+            "role": "user", "is_admin": False, "preset": body.preset,
+        }
     return _create_admin_user(body, current)
 
 
@@ -1819,7 +2088,11 @@ async def admin_import_users(
 
     for row_number, body, username in parsed:
         try:
-            created = _create_admin_user(body, current)
+            created = (
+                await admin_create_user(body, current)
+                if postgres_accounts_enabled()
+                else _create_admin_user(body, current)
+            )
         except HTTPException as exc:
             detail = exc.detail if isinstance(exc.detail, str) else "Failed to create user"
             results.append({"row": row_number, "username": username, "ok": False, "error": detail})
@@ -1881,6 +2154,12 @@ async def remove_user(
     current: TokenPayload = Depends(require_admin),
 ) -> dict:
     """Delete a user. Admins cannot delete their own account."""
+    if postgres_accounts_enabled():
+        user = await get_postgres_web_account_gateway().users.get_user_by_username(username)
+        if user is None or not await get_postgres_web_account_gateway().users.deactivate(user["id"]):
+            raise HTTPException(status_code=404, detail="User not found")
+        log_admin_action("user_deactivate", target_user_id=user["id"], summary={"username": username})
+        return {"ok": True, "deactivated": True}
     status_code, detail = _delete_admin_user(username, current)
     if status_code != 200:
         raise HTTPException(status_code=status_code, detail=detail)
@@ -1894,6 +2173,30 @@ async def batch_remove_users(
 ) -> dict:
     """Delete selected users and report each outcome separately."""
     results: list[dict] = []
+    if postgres_accounts_enabled():
+        users = get_postgres_web_account_gateway().users
+        for username in body.usernames:
+            user = await users.get_user_by_username(username)
+            if user is None:
+                results.append({"username": username, "ok": False, "error": "User not found"})
+                continue
+            changed = await users.deactivate(user["id"])
+            if changed:
+                log_admin_action(
+                    "user_deactivate", target_user_id=user["id"],
+                    summary={"username": username, "source": "batch"},
+                )
+            results.append({
+                "username": username, "ok": bool(changed),
+                "error": None if changed else "User not found",
+            })
+        deleted_count = sum(1 for result in results if result["ok"])
+        return {
+            "ok": deleted_count == len(results),
+            "deleted_count": deleted_count,
+            "failed_count": len(results) - deleted_count,
+            "results": results,
+        }
     for username in body.usernames:
         _status_code, detail = _delete_admin_user(username, current)
         results.append({"username": username, "ok": not detail, "error": detail or None})
@@ -1926,6 +2229,24 @@ async def update_user_role(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You cannot change your own role",
         )
+
+    if body.role == "admin":
+        raise HTTPException(
+            status_code=400,
+            detail="Create administrators through the separate administrator account endpoint.",
+        )
+
+    if postgres_accounts_enabled():
+        user = await get_postgres_web_account_gateway().users.get_user_by_username(username)
+        if user is None or not await get_postgres_web_account_gateway().users.set_role(
+            user["id"], body.role
+        ):
+            raise HTTPException(status_code=404, detail="User not found")
+        return {"ok": True, "username": username, "role": body.role}
+
+    existing = get_user_info(username)
+    if existing and existing.get("role") == "admin":
+        raise HTTPException(status_code=403, detail="Administrator roles cannot be changed here")
 
     updated = set_role(username, body.role)
     if not updated:

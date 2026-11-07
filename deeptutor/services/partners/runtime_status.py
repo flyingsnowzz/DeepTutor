@@ -117,17 +117,87 @@ class PartnerRuntimeStatusRepository:
             )
 
 
-_repository: PartnerRuntimeStatusRepository | None = None
+class PostgresPartnerRuntimeStatusRepository:
+    """Process-shared status used when first-party storage is PostgreSQL."""
+
+    @staticmethod
+    def _connect():
+        import psycopg
+        from deeptutor.services.postgres.database import database_url
+
+        url = database_url().replace("postgresql+asyncpg://", "postgresql://", 1)
+        return psycopg.connect(url)
+
+    def set(
+        self,
+        partner_id: str,
+        *,
+        owner_id: str,
+        running: bool,
+        state: str,
+        payload: dict[str, Any] | None = None,
+        started_at: str | None = None,
+        last_reload_error: str | None = None,
+    ) -> dict[str, Any]:
+        updated_at = time.time()
+        safe_payload = dict(payload or {})
+        safe_payload.pop("channels", None)
+        safe_payload.update({
+            "partner_id": partner_id,
+            "runtime_owner_id": owner_id,
+            "running": bool(running),
+            "runtime_state": state,
+            "started_at": started_at,
+            "last_reload_error": last_reload_error,
+            "runtime_updated_at": updated_at,
+        })
+        with self._connect() as connection:
+            connection.execute(
+                """INSERT INTO partner_runtime_status(partner_id, owner_id, payload, updated_at)
+                   VALUES (%s, %s, %s::jsonb, %s)
+                   ON CONFLICT(partner_id) DO UPDATE SET
+                       owner_id=excluded.owner_id, payload=excluded.payload,
+                       updated_at=excluded.updated_at""",
+                (partner_id, owner_id, json.dumps(safe_payload, ensure_ascii=False), updated_at),
+            )
+        return safe_payload
+
+    def get(self, partner_id: str) -> dict[str, Any] | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT payload FROM partner_runtime_status WHERE partner_id=%s", (partner_id,)
+            ).fetchone()
+        return row[0] if row else None
+
+    def list(self) -> dict[str, dict[str, Any]]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT partner_id, payload FROM partner_runtime_status"
+            ).fetchall()
+        return {row[0]: row[1] for row in rows}
+
+    def delete(self, partner_id: str) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                "DELETE FROM partner_runtime_status WHERE partner_id=%s", (partner_id,)
+            )
 
 
-def get_partner_runtime_status_repository() -> PartnerRuntimeStatusRepository:
+_repository: PartnerRuntimeStatusRepository | PostgresPartnerRuntimeStatusRepository | None = None
+
+
+def get_partner_runtime_status_repository() -> PartnerRuntimeStatusRepository | PostgresPartnerRuntimeStatusRepository:
     global _repository
-    if _repository is None:
-        _repository = PartnerRuntimeStatusRepository()
+    from deeptutor.services.storage_backend import storage_backend
+
+    postgres = storage_backend() == "postgres"
+    if _repository is None or postgres != isinstance(_repository, PostgresPartnerRuntimeStatusRepository):
+        _repository = PostgresPartnerRuntimeStatusRepository() if postgres else PartnerRuntimeStatusRepository()
     return _repository
 
 
 __all__ = [
     "PartnerRuntimeStatusRepository",
+    "PostgresPartnerRuntimeStatusRepository",
     "get_partner_runtime_status_repository",
 ]

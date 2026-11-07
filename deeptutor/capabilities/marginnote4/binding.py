@@ -40,7 +40,7 @@ def _resolve(context: UnifiedContext) -> dict[str, str] | None:
         from deeptutor.capabilities.marginnote4.store import resolve_db_path
 
         db_path = str(resolve_db_path(ref, metadata=meta))
-        return {"name": str(meta.get("name") or ref), "db_path": db_path}
+        return {"name": str(meta.get("name") or ref), "db_path": db_path, "kb_name": ref}
     return None
 
 

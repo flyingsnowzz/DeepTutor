@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import re
 import uuid
 
 import pytest
@@ -17,34 +16,17 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 
-def _app_database_url() -> str | None:
-    url = os.environ["DATABASE_URL"]
-    if "deeptutor_app:" in url:
-        return url
-    return url.replace("deeptutor:deeptutor@", "deeptutor_app:appdev@", 1)
-
-
-async def _app_engine_works() -> bool:
-    url = _app_database_url()
-    if "deeptutor_app:appdev@" not in url:
-        return False
-    engine = create_async_engine(url)
-    try:
-        async with engine.connect() as c:
-            await c.execute(text("SELECT 1"))
-        return True
-    except Exception:  # noqa: BLE001
-        return False
-    finally:
-        await engine.dispose()
-
-
 @pytest.mark.asyncio
 async def test_rls_blocks_cross_owner_rows():
-    if not await _app_engine_works():
-        pytest.skip("restricted deeptutor_app role is not configured")
+    from sqlalchemy.engine import make_url
 
-    admin = create_async_engine(os.environ["DATABASE_URL"])
+    if make_url(os.environ["DATABASE_URL"]).username != "deeptutor_app":
+        pytest.skip("requires DATABASE_URL using the restricted deeptutor_app role")
+    admin_url = os.environ.get("TEST_DATABASE_ADMIN_URL")
+    if not admin_url:
+        pytest.skip("requires TEST_DATABASE_ADMIN_URL for isolated setup and cleanup")
+
+    admin = create_async_engine(admin_url.replace("postgresql://", "postgresql+asyncpg://", 1))
     owner_a = f"rls_a_{uuid.uuid4().hex[:8]}"
     owner_b = f"rls_b_{uuid.uuid4().hex[:8]}"
     try:
@@ -59,7 +41,7 @@ async def test_rls_blocks_cross_owner_rows():
                 {"id": f"sess_{uuid.uuid4().hex}", "o": owner_a},
             )
 
-        app_engine = create_async_engine(_app_database_url())
+        app_engine = create_async_engine(os.environ["DATABASE_URL"])
         try:
             # No app.user_id GUC: RLS hides everything from the restricted role.
             async with app_engine.connect() as c:
@@ -74,8 +56,7 @@ async def test_rls_blocks_cross_owner_rows():
 
             # Impersonating A shows A's row; writing another owner's row is rejected.
             async with app_engine.begin() as c:
-                assert re.fullmatch(r"[A-Za-z0-9_\-]{1,64}", owner_a)
-                await c.execute(text(f"SET LOCAL app.user_id = '{owner_a}'"))
+                await c.execute(text("SELECT set_config('app.user_id', :owner, true)"), {"owner": owner_a})
                 visible = (
                     await c.execute(
                         text("SELECT count(*) FROM sessions WHERE owner_user_id = :o"),

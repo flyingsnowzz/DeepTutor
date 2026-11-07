@@ -4717,6 +4717,10 @@ _instances: dict[str, SQLiteSessionStore] = {}
 
 
 def get_sqlite_session_store() -> SQLiteSessionStore:
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        raise RuntimeError("SQLite session store is unavailable in PostgreSQL storage mode")
     db_path = get_path_service().get_chat_history_db().resolve()
     key = str(db_path)
     if key not in _instances:
@@ -4731,6 +4735,10 @@ def get_sqlite_session_store_for(path_service: Any) -> SQLiteSessionStore:
     bank entries into the learner-facing bank; the target scope's path service
     resolves its chat-history db, and instances stay cached per resolved path.
     """
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        raise RuntimeError("SQLite session store is unavailable in PostgreSQL storage mode")
     db_path = path_service.get_chat_history_db().resolve()
     key = str(db_path)
     if key not in _instances:

@@ -156,9 +156,10 @@ async def _run_chat_turn(job: CronJob, prompt: str) -> tuple[str, str | None]:
     from deeptutor.core.context import UnifiedContext
     from deeptutor.core.stream import StreamEventType
     from deeptutor.runtime.turn_engine import get_turn_engine
-    from deeptutor.services.session import get_sqlite_session_store
+    from deeptutor.services.session import get_session_store, get_sqlite_session_store
+    from deeptutor.services.storage_backend import storage_backend
 
-    store = get_sqlite_session_store()
+    store = get_session_store() if storage_backend() == "postgres" else get_sqlite_session_store()
     session = await store.get_session(job.owner.session_id)
     if session is None:
         return "error", "session no longer exists"

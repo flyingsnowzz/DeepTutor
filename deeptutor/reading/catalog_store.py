@@ -51,33 +51,7 @@ def _collection_color(color: str) -> str:
     return key if key in COLLECTION_COLORS else ""
 
 
-class ReadingCatalogStore:
-    """Durable workspace metadata for one already-scoped owner."""
-
-    def __init__(self, root: Path | str | None = None) -> None:
-        if root is None:
-            root = get_path_service().get_workspace_feature_dir("reading")
-        self.root = Path(root)
-        self.root.mkdir(parents=True, exist_ok=True)
-        self.db_path = self.root / "_catalog.sqlite3"
-        self._lock = threading.RLock()
-        self._initialize()
-
-    @contextmanager
-    def _connect(self) -> Iterator[sqlite3.Connection]:
-        conn = sqlite3.connect(self.db_path, timeout=30)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
-        try:
-            with conn:
-                yield conn
-        finally:
-            conn.close()
-
-    def _initialize(self) -> None:
-        with self._lock, self._connect() as conn:
-            conn.executescript(
-                """
+_SCHEMA_SQL = """
                 CREATE TABLE IF NOT EXISTS reading_schema (version INTEGER NOT NULL);
                 INSERT INTO reading_schema(version)
                     SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM reading_schema);
@@ -161,7 +135,49 @@ class ReadingCatalogStore:
                     CHECK (source_session_id <> target_session_id)
                 );
                 """
-            )
+
+class ReadingCatalogStore:
+    """Durable workspace metadata for one already-scoped owner."""
+
+    def __init__(self, root: Path | str | None = None) -> None:
+        from deeptutor.services.storage_backend import storage_backend
+
+        self._postgres = storage_backend() == "postgres"
+        if self._postgres:
+            from deeptutor.services.storage_backend import postgres_owner_user_id
+            from deeptutor.services.workspace.context import current_workspace_id
+
+            self._postgres_owner = postgres_owner_user_id()
+            self._postgres_workspace = current_workspace_id()
+        if root is None:
+            root = get_path_service().get_workspace_feature_dir("reading")
+        self.root = Path(root)
+        self.root.mkdir(parents=True, exist_ok=True)
+        self.db_path = self.root / "_catalog.sqlite3"
+        self._lock = threading.RLock()
+        if not self._postgres:
+            self._initialize()
+
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        if self._postgres:
+            from deeptutor.reading.postgres_catalog import postgres_catalog_connection
+
+            with postgres_catalog_connection(self._postgres_owner, self._postgres_workspace) as conn:
+                yield conn
+            return
+        conn = sqlite3.connect(self.db_path, timeout=30)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
+
+    def _initialize(self) -> None:
+        with self._lock, self._connect() as conn:
+            conn.executescript(_SCHEMA_SQL)
             columns = {
                 str(row["name"])
                 for row in conn.execute("PRAGMA table_info(reading_materials)").fetchall()

@@ -466,6 +466,12 @@ _DEFAULT_STORE: SessionHandoffStore | None = None
 
 
 def get_session_handoff_store() -> SessionHandoffStore:
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        from .postgres_session_handoff import PostgresSessionHandoffStore
+
+        return PostgresSessionHandoffStore()  # type: ignore[return-value]
     global _DEFAULT_STORE
     if _DEFAULT_STORE is None:
         _DEFAULT_STORE = SessionHandoffStore()

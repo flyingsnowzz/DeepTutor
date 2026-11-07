@@ -6200,5 +6200,13 @@
   "customize.learningHint": "选择在新建学习页显示的学习方式。隐藏后可以随时重新添加。",
   "customize.emptyLearning": "为下一次学习做好准备",
   "customize.emptyLearningHint": "通过自定义页面添加学习方式。未安装或已禁用的模块可在设置 → 运行时中查看。",
-  "customize.learningFooter": "自定义设置会保存到你的账户；此处仅显示当前环境中可用的学习方式。"
+  "customize.learningFooter": "自定义设置会保存到你的账户；此处仅显示当前环境中可用的学习方式。",
+  "Administrator sign in": "管理员登录",
+  "User sign in": "用户登录",
+  "Administrators": "管理员",
+  "Administrator": "管理员",
+  "Super administrator": "超级管理员",
+  "Create administrator": "创建管理员",
+  "Failed to load administrators": "加载管理员失败",
+  "Failed to create administrator": "创建管理员失败"
 }

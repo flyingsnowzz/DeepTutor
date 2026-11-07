@@ -299,6 +299,23 @@ def _validate_reading_policy(grant: dict[str, Any]) -> None:
 
 
 def _require_assignable_user(user_id: str) -> tuple[str, dict[str, Any]]:
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        import psycopg
+        from deeptutor.services.postgres.database import authentication_database_url
+
+        url = authentication_database_url().replace("postgresql+asyncpg://", "postgresql://", 1)
+        with psycopg.connect(url) as db:
+            db.execute("SELECT set_config('app.user_id', %s, true)", (user_id,))
+            row = db.execute(
+                """SELECT u.username,u.role,u.preset FROM users u
+                   JOIN first_party_credentials c ON c.owner_user_id=u.id
+                   WHERE u.id=%s AND u.is_active=true""", (user_id,),
+            ).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        return str(row[0]), {"id": user_id, "username": row[0], "role": row[1], "preset": row[2]}
     user_record = get_user_by_id(user_id)
     if user_record is None:
         raise HTTPException(status_code=404, detail="User not found")

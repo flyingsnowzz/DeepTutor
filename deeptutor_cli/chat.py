@@ -12,7 +12,8 @@ from rich.panel import Panel
 from rich.text import Text
 import typer
 
-from deeptutor.app import DeepTutorApp, TurnRequest
+from deeptutor.app import TurnRequest
+from deeptutor_cli.app import create_cli_app
 
 from .common import (
     console,
@@ -84,11 +85,7 @@ def register(app: typer.Typer) -> None:
 
 
 async def _chat_repl(state: ChatState) -> None:
-    client = (
-        DeepTutorApp(workspace_id=state.workspace_id)
-        if state.workspace_id is not None
-        else DeepTutorApp()
-    )
+    client = create_cli_app(workspace_id=state.workspace_id)
     cron_service = None
     try:
         from deeptutor.services.cron import get_cron_service

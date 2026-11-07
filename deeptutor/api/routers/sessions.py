@@ -583,6 +583,8 @@ async def update_session_organization(
 
         current_scope = get_workspace_scope()
         if current_scope is not None and current_scope.workspace_id != workspace_id:
+            from deeptutor.services.storage_backend import storage_backend
+
             # A move changes the store. Do not silently drop other fields or
             # validate their foreign keys against the source and apply them in
             # the destination. Reject the whole request before copying data.
@@ -591,6 +593,14 @@ async def update_session_organization(
                     status_code=400,
                     detail="Move the conversation separately from other organization changes.",
                 )
+            if storage_backend() == "postgres":
+                try:
+                    moved = await store.move_session_workspace(
+                        session_id, workspace_id,
+                        source_workspace_id=current_scope.workspace_id)
+                except ValueError as exc:
+                    raise HTTPException(status_code=409, detail=str(exc)) from exc
+                return {"session": moved}
             from deeptutor.api.routers.workspace import _data_operation
             from deeptutor.services.workspace.session_move import move_chat
 
@@ -735,7 +745,9 @@ async def purge_session(session_id: str):
 
 @router.put("/{session_id}/branch-selection")
 async def update_branch_selection(session_id: str, payload: BranchSelectionRequest):
-    store = get_sqlite_session_store()
+    from deeptutor.services.storage_backend import storage_backend
+
+    store = get_session_store() if storage_backend() == "postgres" else get_sqlite_session_store()
     session = await store.get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -749,8 +761,13 @@ async def update_branch_selection(session_id: str, payload: BranchSelectionReque
 
 @router.delete("/{session_id}/messages/{message_id}")
 async def delete_turn_by_message(session_id: str, message_id: int):
-    store = get_sqlite_session_store()
-    result = await store.delete_turn_by_message(session_id, message_id)
+    from deeptutor.services.storage_backend import storage_backend
+
+    store = get_session_store() if storage_backend() == "postgres" else get_sqlite_session_store()
+    delete_turn = getattr(store, "delete_turn_by_message", None)
+    if not callable(delete_turn):
+        raise HTTPException(status_code=501, detail="Message deletion is unavailable")
+    result = await delete_turn(session_id, message_id)
     if result["was_active"]:
         raise HTTPException(
             status_code=409,
@@ -771,7 +788,9 @@ async def delete_turn_by_message(session_id: str, message_id: int):
 async def record_quiz_results(session_id: str, payload: QuizResultsRequest):
     if not payload.answers:
         raise HTTPException(status_code=400, detail="Quiz results are required")
-    store = get_sqlite_session_store()
+    from deeptutor.services.storage_backend import storage_backend
+
+    store = get_session_store() if storage_backend() == "postgres" else get_sqlite_session_store()
     session = await store.get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")

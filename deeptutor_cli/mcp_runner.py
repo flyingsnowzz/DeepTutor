@@ -85,9 +85,9 @@ class TurnCapabilityRunner:
             return await self._run_mastery_path(payload)
 
         internal_name = _CAPABILITY_ALIASES.get(capability, capability)
-        from deeptutor.app import DeepTutorApp
+        from deeptutor_cli.app import create_cli_app
 
-        app = DeepTutorApp()
+        app = create_cli_app()
         session, turn, result, usage = await self._run_turn(app, internal_name, payload)
         if internal_name == "deep_research" and result.get("outline_preview"):
             # The first-party UI asks the learner to confirm this outline. An

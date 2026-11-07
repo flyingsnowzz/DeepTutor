@@ -4,7 +4,7 @@ import { Suspense, useCallback, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useTranslation } from "react-i18next";
-import { login, fetchAuthStatus, checkIsFirstUser } from "@/lib/auth";
+import { login, fetchAuthStatus } from "@/lib/auth";
 import {
   inheritLoginHash,
   normalizeInternalReturnPath,
@@ -38,10 +38,6 @@ function LoginPageContent() {
         router.replace(resolvedNext());
         return;
       }
-      // No users registered yet — send straight to the registration page
-      checkIsFirstUser().then((first) => {
-        if (first) router.replace("/register");
-      });
     });
   }, [router, resolvedNext]);
 
@@ -159,6 +155,12 @@ function LoginPageContent() {
           className="text-[var(--primary)] hover:underline font-medium"
         >
           {t("Create one")}
+        </Link>
+      </p>
+
+      <p className="mt-3 text-center text-sm text-[var(--muted-foreground)]">
+        <Link href="/admin/login" className="text-[var(--primary)] hover:underline">
+          {t("Administrator sign in")}
         </Link>
       </p>
 

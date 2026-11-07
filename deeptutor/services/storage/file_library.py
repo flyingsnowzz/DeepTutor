@@ -464,6 +464,20 @@ def get_file_library_store() -> FileLibraryStore:
     constant key here would pin every user to whichever user's request
     happened to populate the cache first.
     """
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        from deeptutor.services.storage_backend import postgres_owner_user_id
+        from deeptutor.services.storage.postgres_file_library import PostgresFileLibraryStore
+
+        owner = postgres_owner_user_id()
+        key = f"postgres:{owner}"
+        if key not in _instances:
+            user_root = get_path_service().get_user_root()
+            root = user_root.joinpath(*_LIBRARY_FILES_SUBDIR).resolve()
+            _instances[key] = PostgresFileLibraryStore(root=root)
+        return _instances[key]
+
     user_root = get_path_service().get_user_root()
     key = str(user_root)
     if key not in _instances:

@@ -129,9 +129,10 @@ async def _resolve_store(store: Any) -> Any:
         from deeptutor.services.session import get_sqlite_session_store_for
 
         return get_sqlite_session_store_for(target_paths)
-    from deeptutor.services.session import get_sqlite_session_store
+    from deeptutor.services.session import get_session_store, get_sqlite_session_store
+    from deeptutor.services.storage_backend import storage_backend
 
-    return get_sqlite_session_store()
+    return get_session_store() if storage_backend() == "postgres" else get_sqlite_session_store()
 
 
 def _partner_bank_paths() -> Any | None:

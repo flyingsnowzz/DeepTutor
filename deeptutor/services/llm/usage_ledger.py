@@ -40,6 +40,36 @@ def ledger_path() -> Path:
     return get_owner_path_service().get_user_root() / "usage.sqlite3"
 
 
+def _postgres_connection():
+    import psycopg
+    from psycopg.rows import dict_row
+
+    from deeptutor.services.postgres.database import database_url
+    from deeptutor.services.storage_backend import postgres_owner_user_id
+
+    owner = postgres_owner_user_id()
+    url = database_url().replace("postgresql+asyncpg://", "postgresql://", 1)
+    connection = psycopg.connect(url, row_factory=dict_row)
+    connection.execute("SELECT set_config('app.user_id', %s, true)", (owner,))
+    return connection, owner
+
+
+def _postgres_rows(start_at: float, end_at: float) -> list[dict[str, Any]]:
+    with closing(_postgres_connection()[0]) as conn:
+        owner = _postgres_owner(conn)
+        return conn.execute(
+            """SELECT started_at,session_id,turn_id,source,usage_json
+               FROM llm_call_ledger WHERE owner_user_id=%s
+               AND started_at >= %s AND started_at < %s
+               ORDER BY started_at,call_id""",
+            (owner, start_at, end_at),
+        ).fetchall()
+
+
+def _postgres_owner(conn) -> str:
+    return conn.execute("SELECT current_setting('app.user_id', true)").fetchone()["current_setting"]
+
+
 def record_call(
     path: Path,
     call: dict[str, Any],
@@ -49,6 +79,21 @@ def record_call(
     turn_id: str = "",
     source: str = "",
 ) -> None:
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        from psycopg.types.json import Jsonb
+
+        with closing(_postgres_connection()[0]) as conn, conn:
+            owner = _postgres_owner(conn)
+            conn.execute(
+                """INSERT INTO llm_call_ledger
+                   (owner_user_id,call_id,started_at,session_id,turn_id,source,usage_json)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING""",
+                (owner, call["call_id"], started_at, session_id, turn_id, source,
+                 Jsonb({k: v for k, v in call.items() if k in _CALL_FIELDS})),
+            )
+        return
     from deeptutor.utils.secret_files import ensure_private_directory, ensure_private_file
 
     ensure_private_directory(path.parent)
@@ -76,6 +121,25 @@ def record_call(
 def usage_records(
     start_at: float, end_at: float, *, path: Path | None = None
 ) -> list[dict[str, Any]]:
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        rows = _postgres_rows(start_at, end_at)
+        from .metrics import TurnUsage
+
+        records = []
+        for row in rows:
+            collector = TurnUsage()
+            collector.calls.append(row["usage_json"])
+            records.append({
+                "created_at": row["started_at"],
+                "session_id": row["session_id"],
+                "turn_id": row["turn_id"],
+                "activity_id": row["turn_id"] or collector.calls[0]["call_id"],
+                "source": row["source"],
+                "summaries": [collector.summary()],
+            })
+        return records
     path = path or ledger_path()
     if not path.exists():
         return []
@@ -141,6 +205,22 @@ def merge_records(
 def combined_usage_records(
     history: list[dict[str, Any]], start_at: float, end_at: float
 ) -> list[dict[str, Any]]:
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        ledger = usage_records(start_at, end_at)
+        candidates = list({str(c["call_id"]) for record in history
+                           for summary in record.get("summaries", [])
+                           for c in summary.get("call_details", []) if c.get("call_id")})
+        persisted: set[str] = set()
+        if candidates:
+            with closing(_postgres_connection()[0]) as conn:
+                owner = _postgres_owner(conn)
+                persisted = {row["call_id"] for row in conn.execute(
+                    "SELECT call_id FROM llm_call_ledger WHERE owner_user_id=%s AND call_id=ANY(%s)",
+                    (owner, candidates),
+                ).fetchall()}
+        return merge_records(history, ledger, persisted_ids=persisted)
     path = ledger_path()
     ledger = usage_records(start_at, end_at, path=path)
     # A request can start before New Year and finish after it. Its ledger date

@@ -135,6 +135,10 @@ class SQLiteWebSourceSyncRepository:
 
     def _initialize(self) -> None:
         with self._connect() as connection:
+            self._initialize_schema(connection)
+
+    @staticmethod
+    def _initialize_schema(connection: sqlite3.Connection) -> None:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS web_source_sync_jobs (
@@ -637,4 +641,43 @@ class SQLiteWebSourceSyncRepository:
             return int(cursor.rowcount or 0)
 
 
-__all__ = ["SQLiteWebSourceSyncRepository", "WebSourceBilingualPairing", "WebSourceSyncJob"]
+class PostgresWebSourceSyncRepository(SQLiteWebSourceSyncRepository):
+    """Run the established scheduler state machine inside a PostgreSQL row lock."""
+
+    def __init__(self) -> None:
+        # The SQLite image is transient per transaction; no local database is created.
+        pass
+
+    @contextlib.contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        import psycopg
+        from deeptutor.services.postgres.database import database_url
+
+        url = database_url().replace("postgresql+asyncpg://", "postgresql://", 1)
+        with psycopg.connect(url) as pg:
+            pg.execute(
+                "INSERT INTO web_source_sync_state(id,sqlite_image,revision) "
+                "VALUES (1,%s,0) ON CONFLICT(id) DO NOTHING",
+                (b"",),
+            )
+            image = pg.execute(
+                "SELECT sqlite_image FROM web_source_sync_state WHERE id=1 FOR UPDATE"
+            ).fetchone()[0]
+            connection = sqlite3.connect(":memory:", isolation_level=None)
+            connection.row_factory = sqlite3.Row
+            try:
+                if image:
+                    connection.deserialize(bytes(image))
+                else:
+                    self._initialize_schema(connection)
+                yield connection
+                pg.execute(
+                    "UPDATE web_source_sync_state SET sqlite_image=%s,revision=revision+1 WHERE id=1",
+                    (connection.serialize(),),
+                )
+            finally:
+                connection.close()
+
+
+__all__ = ["SQLiteWebSourceSyncRepository", "PostgresWebSourceSyncRepository",
+           "WebSourceBilingualPairing", "WebSourceSyncJob"]

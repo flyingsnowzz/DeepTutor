@@ -200,7 +200,14 @@ class ReadingStore:
             raise ReadingError(f"invalid material id: {material_id!r}")
         return candidate
 
-    def _catalog_row(self, material_id: str) -> sqlite3.Row | None:
+    def _catalog_row(self, material_id: str) -> sqlite3.Row | Mapping[str, Any] | None:
+        from deeptutor.services.storage_backend import storage_backend
+
+        if storage_backend() == "postgres":
+            from deeptutor.reading.catalog_store import ReadingCatalogStore
+
+            material = ReadingCatalogStore(self.root).get_material(material_id)
+            return {"content_id": material.content_id} if material else None
         db_path = self.root / "_catalog.sqlite3"
         if not db_path.is_file():
             return None

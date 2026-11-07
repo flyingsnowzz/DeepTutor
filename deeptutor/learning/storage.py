@@ -397,6 +397,21 @@ class LearningStore:
 
     _DB_FILENAME = "mastery.sqlite3"
 
+    def __new__(cls, root: Path | None = None):
+        if cls is LearningStore:
+            from deeptutor.services.storage_backend import storage_backend
+
+            if storage_backend() == "postgres":
+                if root is not None:
+                    raise RuntimeError(
+                        "Explicit SQLite Mastery roots are unavailable in PostgreSQL storage mode"
+                    )
+                from deeptutor.learning.storage_postgres_sync import PostgresLearningStore
+                from deeptutor.services.storage_backend import postgres_owner_user_id
+
+                return PostgresLearningStore(postgres_owner_user_id())
+        return super().__new__(cls)
+
     def __init__(self, root: Path | None = None) -> None:
         if root is None:
             # Explicit roots are used by tests and SDK callers as direct store

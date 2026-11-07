@@ -70,6 +70,44 @@ export interface paths {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/auth/admin/accounts": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /** Get Admin Accounts */
+    readonly get: operations["get_admin_accounts_api_auth_admin_accounts_get"];
+    readonly put?: never;
+    /** Create Admin Account */
+    readonly post: operations["create_admin_account_api_auth_admin_accounts_post"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/auth/admin/login": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Admin Login
+     * @description Authenticate administrators through their separate account entrance.
+     */
+    readonly post: operations["admin_login_api_auth_admin_login_post"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/auth/avatar/{user_id}": {
     readonly parameters: {
       readonly query?: never;
@@ -203,7 +241,7 @@ export interface paths {
     readonly put?: never;
     /**
      * Login
-     * @description Validate credentials and set a JWT cookie.
+     * @description Validate ordinary user credentials and set a JWT cookie.
      */
     readonly post: operations["login_api_auth_login_post"];
     readonly delete?: never;
@@ -342,13 +380,7 @@ export interface paths {
     readonly put?: never;
     /**
      * Register
-     * @description Bootstrap-only registration.
-     *
-     *     Public endpoint that creates the *first* admin account when the user store
-     *     is empty. Once an admin exists, this endpoint is closed; further accounts
-     *     must be created by an admin via ``POST /api/auth/users``.
-     *
-     *     Only available when AUTH_ENABLED=true.
+     * @description Public registration for ordinary accounts when authentication is enabled.
      */
     readonly post: operations["register_api_auth_register_post"];
     readonly delete?: never;
@@ -446,7 +478,7 @@ export interface paths {
     };
     /**
      * Get Users
-     * @description List all registered users. Requires admin role.
+     * @description List learner accounts; administrator accounts have their own endpoint.
      */
     readonly get: operations["get_users_api_auth_users_get"];
     readonly put?: never;
@@ -4589,6 +4621,23 @@ export interface paths {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/modules": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /** List Modules */
+    readonly get: operations["list_modules_api_modules_get"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/multi-user/admin/books": {
     readonly parameters: {
       readonly query?: never;
@@ -8665,6 +8714,57 @@ export interface paths {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/settings/page-customization": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /** Get Page Customization */
+    readonly get: operations["get_page_customization_api_settings_page_customization_get"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/settings/page-customization/chat": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    /** Update Chat Page Customization */
+    readonly put: operations["update_chat_page_customization_api_settings_page_customization_chat_put"];
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/settings/page-customization/learning": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    /** Update Learning Page Customization */
+    readonly put: operations["update_learning_page_customization_api_settings_page_customization_learning_put"];
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/settings/presets": {
     readonly parameters: {
       readonly query?: never;
@@ -11683,6 +11783,11 @@ export interface components {
        * @default false
        */
       readonly is_admin: boolean;
+      /**
+       * Is Super Admin
+       * @default false
+       */
+      readonly is_super_admin: boolean;
       /** Learning Policy */
       readonly learning_policy?: {
         readonly [key: string]: unknown;
@@ -12416,6 +12521,18 @@ export interface components {
       /** Session Key */
       readonly session_key?: string | null;
     };
+    /** ChatPageCustomization */
+    readonly ChatPageCustomization: {
+      readonly controls?: components["schemas"]["ComposerControls"];
+      /** Hidden Modes */
+      readonly hidden_modes?: readonly string[];
+      /** Starters */
+      readonly starters?: {
+        readonly [
+          key: string
+        ]: readonly components["schemas"]["StarterPrompt"][];
+      };
+    };
     /** ChatResponseTimeoutUpdate */
     readonly ChatResponseTimeoutUpdate: {
       /** Chat Response Timeout */
@@ -12496,6 +12613,34 @@ export interface components {
       readonly force: boolean;
       /** Page Id */
       readonly page_id: string;
+    };
+    /** ComposerControls */
+    readonly ComposerControls: {
+      /**
+       * Mcp
+       * @default true
+       */
+      readonly mcp: boolean;
+      /**
+       * Partners
+       * @default true
+       */
+      readonly partners: boolean;
+      /**
+       * Preferences
+       * @default true
+       */
+      readonly preferences: boolean;
+      /**
+       * Skills
+       * @default true
+       */
+      readonly skills: boolean;
+      /**
+       * Voice
+       * @default true
+       */
+      readonly voice: boolean;
     };
     /**
      * ConfirmPartnerDraftRequest
@@ -14038,6 +14183,13 @@ export interface components {
       readonly status?: string | null;
       /** User Note */
       readonly user_note?: string | null;
+    };
+    /** LearningPageCustomization */
+    readonly LearningPageCustomization: {
+      /** Hidden Features */
+      readonly hidden_features?: readonly (
+        "books" | "mastery" | "practice" | "reading"
+      )[];
     };
     /**
      * LightRagConfigUpdate
@@ -16514,6 +16666,13 @@ export interface components {
       /** Content */
       readonly content: string;
     };
+    /** StarterPrompt */
+    readonly StarterPrompt: {
+      /** Label */
+      readonly label: string;
+      /** Prompt */
+      readonly prompt: string;
+    };
     /** StatusColors */
     readonly StatusColors: {
       /**
@@ -18196,6 +18355,8 @@ export type SchemaChatHistoryImportRequest =
   components["schemas"]["ChatHistoryImportRequest"];
 export type SchemaChatMessageRequest =
   components["schemas"]["ChatMessageRequest"];
+export type SchemaChatPageCustomization =
+  components["schemas"]["ChatPageCustomization"];
 export type SchemaChatResponseTimeoutUpdate =
   components["schemas"]["ChatResponseTimeoutUpdate"];
 export type SchemaChatStarterSettingsUpdate =
@@ -18208,6 +18369,7 @@ export type SchemaCodexReasoningEffortUpdate =
 export type SchemaCommitRequest = components["schemas"]["CommitRequest"];
 export type SchemaCompilePageRequest =
   components["schemas"]["CompilePageRequest"];
+export type SchemaComposerControls = components["schemas"]["ComposerControls"];
 export type SchemaConfirmPartnerDraftRequest =
   components["schemas"]["ConfirmPartnerDraftRequest"];
 export type SchemaConfirmProposalRequest =
@@ -18380,6 +18542,8 @@ export type SchemaLearningCaptureCreateRequest =
   components["schemas"]["LearningCaptureCreateRequest"];
 export type SchemaLearningCaptureUpdateRequest =
   components["schemas"]["LearningCaptureUpdateRequest"];
+export type SchemaLearningPageCustomization =
+  components["schemas"]["LearningPageCustomization"];
 export type SchemaLightRagConfigUpdate =
   components["schemas"]["LightRagConfigUpdate"];
 export type SchemaLightRagIndexingSelection =
@@ -18596,6 +18760,7 @@ export type SchemaSoulSpec = components["schemas"]["SoulSpec"];
 export type SchemaSoulTemplateUpdateRequest =
   components["schemas"]["SoulTemplateUpdateRequest"];
 export type SchemaSoulUpdateBody = components["schemas"]["SoulUpdateBody"];
+export type SchemaStarterPrompt = components["schemas"]["StarterPrompt"];
 export type SchemaStatusColors = components["schemas"]["StatusColors"];
 export type SchemaSubagentMessageRequest =
   components["schemas"]["SubagentMessageRequest"];
@@ -18792,6 +18957,115 @@ export interface operations {
         };
         content: {
           readonly "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  readonly get_admin_accounts_api_auth_admin_accounts_get: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+      };
+      readonly path?: never;
+      readonly cookie?: {
+        readonly dt_token?: string | null;
+      };
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": {
+            readonly [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  readonly create_admin_account_api_auth_admin_accounts_post: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+      };
+      readonly path?: never;
+      readonly cookie?: {
+        readonly dt_token?: string | null;
+      };
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["RegisterRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 201: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": {
+            readonly [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  readonly admin_login_api_auth_admin_login_post: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["LoginRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": {
+            readonly [key: string]: unknown;
+          };
         };
       };
       /** @description Validation Error */
@@ -28377,6 +28651,39 @@ export interface operations {
         readonly day: string;
         readonly surface: string;
       };
+      readonly cookie?: {
+        readonly dt_token?: string | null;
+      };
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  readonly list_modules_api_modules_get: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+      };
+      readonly path?: never;
       readonly cookie?: {
         readonly dt_token?: string | null;
       };
@@ -38104,6 +38411,113 @@ export interface operations {
     readonly requestBody: {
       readonly content: {
         readonly "application/json": components["schemas"]["NetworkSettingsUpdate"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  readonly get_page_customization_api_settings_page_customization_get: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+      };
+      readonly path?: never;
+      readonly cookie?: {
+        readonly dt_token?: string | null;
+      };
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  readonly update_chat_page_customization_api_settings_page_customization_chat_put: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+      };
+      readonly path?: never;
+      readonly cookie?: {
+        readonly dt_token?: string | null;
+      };
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["ChatPageCustomization"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  readonly update_learning_page_customization_api_settings_page_customization_learning_put: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+      };
+      readonly path?: never;
+      readonly cookie?: {
+        readonly dt_token?: string | null;
+      };
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["LearningPageCustomization"];
       };
     };
     readonly responses: {

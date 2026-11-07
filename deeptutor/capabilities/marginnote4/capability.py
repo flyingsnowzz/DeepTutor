@@ -64,6 +64,7 @@ class MarginNoteCapability(KnowledgeCapability):
             return kwargs
         updated = dict(kwargs)
         updated["_db_path"] = binding["db_path"]
+        updated["_kb_name"] = binding["kb_name"]
         return updated
 
     def pre_loop_seed(self, context: UnifiedContext) -> str:

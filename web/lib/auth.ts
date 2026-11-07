@@ -17,6 +17,7 @@ export interface AuthStatus {
   username?: string;
   role?: string;
   is_admin?: boolean;
+  is_super_admin?: boolean;
   /** Server-side account preset; null for identities without a local account. */
   preset?: "standard" | "learner" | "custom" | null;
   /** Avatar marker: "", "icon:<name>:<color>", or "img:<version>". */
@@ -118,9 +119,10 @@ export function fetchAuthStatus(): Promise<AuthStatus | null> {
 export async function login(
   username: string,
   password: string,
+  administrator = false,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const res = await apiFetch(apiUrl("/api/auth/login"), {
+    const res = await apiFetch(apiUrl(administrator ? "/api/auth/admin/login" : "/api/auth/login"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
@@ -158,7 +160,7 @@ function extractDetail(detail: unknown): string {
 }
 
 /**
- * Register a new account. The first user to register becomes admin.
+ * Register a normal learning account. Administrator accounts use a separate flow.
  */
 export async function register(
   username: string,
@@ -192,7 +194,7 @@ export async function register(
 }
 
 /**
- * Check whether the user store is empty (first user will become admin).
+ * Check whether the user store is empty.
  */
 export async function checkIsFirstUser(): Promise<boolean> {
   try {
