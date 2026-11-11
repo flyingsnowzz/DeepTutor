@@ -14,7 +14,7 @@ from sqlalchemy import text
 # Keep this in step with the latest first-party Alembic migration. Source and
 # wheel installs both need a revision check without relying on a source-tree
 # alembic.ini at runtime.
-REQUIRED_POSTGRES_REVISION = "0034_marginnote4_state"
+REQUIRED_POSTGRES_REVISION = "0036_guardian_relationships"
 
 
 async def validate_postgres_schema() -> None:

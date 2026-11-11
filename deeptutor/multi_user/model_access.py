@@ -142,6 +142,17 @@ def allowed_llm_options() -> dict[str, Any]:
     llm_service = catalog.get("services", {}).get("llm", {})
     active_profile_id = str(llm_service.get("active_profile_id") or "")
     active_model_id = str(llm_service.get("active_model_id") or "")
+    # A personal active selection takes precedence over the shared default.
+    # Grants remain in the same option list, but a user-defined model must not
+    # disappear merely because the administrator selected another model.
+    from .personal_models import owner_catalog_service
+
+    personal_service = owner_catalog_service()
+    if personal_service.path.exists():
+        personal_llm = personal_service.load().get("services", {}).get("llm", {})
+        if personal_llm.get("active_profile_id") and personal_llm.get("active_model_id"):
+            active_profile_id = str(personal_llm["active_profile_id"])
+            active_model_id = str(personal_llm["active_model_id"])
     options = [
         {
             "profile_id": item.get("profile_id"),

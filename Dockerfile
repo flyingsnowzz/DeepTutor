@@ -2,7 +2,7 @@
 # DeepTutor Multi-Stage Dockerfile
 # ============================================
 # This Dockerfile builds a production-ready image for DeepTutor
-# containing both the FastAPI backend and Next.js frontend
+# containing both the FastAPI backend and Vue 3 frontend
 #
 # Build/run:
 #   docker build -t deeptutor:local .
@@ -22,32 +22,20 @@
 # so there is no need to cross-compile this stage.
 FROM --platform=$BUILDPLATFORM node:22-slim AS frontend-builder
 
-WORKDIR /app/web
+WORKDIR /app/web-vue3
 
 # Copy package files first for better caching
-COPY web/package.json web/package-lock.json* ./
+COPY web-vue3/package.json web-vue3/package-lock.json* ./
 
 # Install dependencies with generous timeout for CI environments
 RUN npm config set fetch-timeout 600000 && \
     npm config set fetch-retries 5 && \
-    npm ci --legacy-peer-deps
+    npm ci
 
 # Copy frontend source code
-COPY web/ ./
+COPY web-vue3/ ./
 
-# Provide the single source of truth for the app version so next.config.js
-# can read it during ``npm run build`` and inline it into the bundle.
-COPY deeptutor/__version__.py /app/deeptutor/__version__.py
-
-# Create .env.local with the single env var the build needs (the app version,
-# exposed to the browser via next.config.js). URL knowledge is no longer baked
-# into the bundle: `apiUrl`/`wsUrl` in web/lib/api.ts are pass-throughs and
-# the actual backend host is read at request time by web/proxy.ts from
-# DEEPTUTOR_API_BASE_URL (exported by the entrypoint on every start).
-RUN printf 'NEXT_PUBLIC_APP_VERSION=\n' > .env.local
-
-# Build Next.js for production with standalone output
-# This allows runtime environment variable injection
+# Build Vue 3 into static production assets. Backend URLs stay runtime configuration.
 RUN npm run build
 
 # ============================================
@@ -171,12 +159,11 @@ RUN rm -rf /usr/local/lib/python3.11/site-packages
 COPY --from=python-base /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=python-base /usr/local/bin /usr/local/bin
 
-# Copy built frontend from frontend-builder stage (standalone mode)
-# The standalone output contains a self-contained server.js + minimal node_modules
-# Static assets and public/ must be copied alongside standalone manually
-COPY --from=frontend-builder /app/web/.next/standalone/ ./web/
-COPY --from=frontend-builder /app/web/.next/static/ ./web/.next/static/
-COPY --from=frontend-builder /app/web/public/ ./web/public/
+# Copy the Vue static server and production assets. It has no runtime npm
+# dependencies; Node only serves dist/ and proxies API/WebSocket requests.
+COPY --from=frontend-builder /app/web-vue3/server.mjs ./web-vue3/server.mjs
+COPY --from=frontend-builder /app/web-vue3/package.json ./web-vue3/package.json
+COPY --from=frontend-builder /app/web-vue3/dist/ ./web-vue3/dist/
 
 # Copy application source code
 COPY deeptutor/ ./deeptutor/
@@ -214,7 +201,7 @@ RUN mkdir -p \
 # skipped (no CAP_SETUID) and UID 1000 matches the typical host user.
 RUN groupadd --system --gid 1000 deeptutor \
     && useradd --system --uid 1000 --gid 1000 --no-create-home --shell /usr/sbin/nologin deeptutor \
-    && chown -R deeptutor:deeptutor /app/data /app/web/.next
+    && chown -R deeptutor:deeptutor /app/data /app/web-vue3
 
 # supervisord config is split into two files so the production and development
 # images share one daemon-level [supervisord] section instead of duplicating it:
@@ -263,7 +250,7 @@ environment=PYTHONPATH="/app",PYTHONUNBUFFERED="1"
 
 [program:frontend]
 command=/bin/bash /app/start-frontend.sh
-directory=/app/web
+directory=/app/web-vue3
 user=deeptutor
 autostart=true
 autorestart=true
@@ -300,7 +287,7 @@ echo "[Backend]  🚀 Starting FastAPI backend on ${BACKEND_HOST}:${BACKEND_PORT
 # the frame cap from the configured attachment policy (system.json) so uploads
 # the policy allows are not severed by uvicorn's 16MB default.
 #
-# --timeout-keep-alive: the frontend proxy (web/proxy.ts) forwards over Node's
+# --timeout-keep-alive: the Vue frontend proxy forwards over Node's
 # http.globalAgent, which reaps idle sockets on a 5s timer — identical to
 # uvicorn's default, so both ends raced to close the same socket and the loser's
 # request died with ECONNRESET (a 500 in the UI). Stay well above the proxy's
@@ -313,9 +300,9 @@ EOF
 RUN sed -i 's/\r$//' /app/start-backend.sh && chmod +x /app/start-backend.sh
 
 # Create frontend startup script
-# This script starts the Next.js standalone server. URL knowledge is no
-# longer baked into the bundle: web/proxy.ts rewrites /api/* and /ws/* to
-# the configured backend at request time, reading DEEPTUTOR_API_BASE_URL
+# This script starts the Vue static server. URL knowledge is not baked into
+# the bundle: server.mjs rewrites /api/*, /files/* and /ws/* to the configured
+# backend at request time, reading DEEPTUTOR_API_ORIGIN/DEEPTUTOR_API_BASE_URL
 # (exported by the entrypoint from data/user/settings/system.json).
 RUN cat > /app/start-frontend.sh <<'EOF'
 #!/bin/bash
@@ -323,11 +310,12 @@ set -e
 
 FRONTEND_PORT=${FRONTEND_PORT:-3782}
 FRONTEND_HOST=${FRONTEND_HOST:-0.0.0.0}
-echo "[Frontend] 🚀 Starting Next.js frontend on ${FRONTEND_HOST}:${FRONTEND_PORT}..."
+echo "[Frontend] 🚀 Starting Vue 3 frontend on ${FRONTEND_HOST}:${FRONTEND_PORT}..."
 
 export PORT=${FRONTEND_PORT}
 export HOSTNAME=${FRONTEND_HOST}
-exec node /app/web/server.js
+export DEEPTUTOR_API_ORIGIN=${DEEPTUTOR_API_ORIGIN:-${DEEPTUTOR_API_BASE_URL:-http://127.0.0.1:8001}}
+exec node /app/web-vue3/server.mjs
 EOF
 
 RUN sed -i 's/\r$//' /app/start-frontend.sh && chmod +x /app/start-frontend.sh
@@ -369,6 +357,7 @@ for key in \
     POCKETBASE_ADMIN_EMAIL \
     POCKETBASE_ADMIN_PASSWORD \
     DEEPTUTOR_API_BASE_URL \
+    DEEPTUTOR_API_ORIGIN \
     DEEPTUTOR_AUTH_ENABLED; do
     unset "$key"
 done
@@ -488,12 +477,12 @@ PY
 
 export BACKEND_PORT=${BACKEND_PORT:-8001}
 export FRONTEND_PORT=${FRONTEND_PORT:-3782}
+export DEEPTUTOR_API_ORIGIN=${DEEPTUTOR_API_ORIGIN:-${DEEPTUTOR_API_BASE_URL:-http://127.0.0.1:${BACKEND_PORT}}}
 
 # DEEPTUTOR_API_BASE_URL and DEEPTUTOR_AUTH_ENABLED are exported by the
 # export_runtime_settings_to_env eval above (see render_environment in
-# deeptutor/services/config/runtime_settings.py). web/proxy.ts reads them at
-# request time to rewrite /api/* and /ws/* to the backend and to gate the login
-# redirect. Keeping them in the single JSON-backed exporter means the Docker and
+# deeptutor/services/config/runtime_settings.py). web-vue3/server.mjs reads them
+# at request time to rewrite /api/*, /files/* and /ws/* to the backend. Keeping them in the single JSON-backed exporter means the Docker and
 # `deeptutor start` paths stay in sync.
 echo "📌 API Base URL (proxy): ${DEEPTUTOR_API_BASE_URL:-http://localhost:${BACKEND_PORT}}"
 echo "📌 Auth enabled: ${DEEPTUTOR_AUTH_ENABLED:-false}"
@@ -553,25 +542,11 @@ ENTRYPOINT ["/app/entrypoint.sh"]
 # ============================================
 FROM production AS development
 
-# `next dev` compiles from source, so the development image needs the whole
-# web tree. This used to cherry-pick node_modules, package.json and
-# next.config.js on top of the production stage — but that stage's ./web is
-# `.next/standalone/`, a compiled server bundle carrying no sources, no
-# tsconfig and no scripts/. So the supervisor program below launched
-# `node scripts/dev.mjs` against a path that never existed, the dev frontend
-# went FATAL, and the image looked broken (#906). Taking the builder's tree
-# wholesale also stops the list from drifting each time web/ grows a
-# top-level entry. `--chown` during the copy avoids re-layering node_modules.
-COPY --chown=deeptutor:deeptutor --from=frontend-builder /app/web ./web
-
-# `next dev` runs as the unprivileged deeptutor user (via `user=deeptutor` in
-# the supervisord config) and must create/write its build cache under
-# /app/web/.next, so give that user ownership of the web dir and the cache.
-# The production build copied in above is not reusable by `next dev`, so it
-# starts from an empty cache rather than a half-valid one.
-RUN rm -rf /app/web/.next \
-    && mkdir -p /app/web/.next \
-    && chown deeptutor:deeptutor /app/web /app/web/.next
+# Vite compiles from source, so the development image needs the complete Vue
+# project and its dependencies. Copying the builder tree also keeps dev-tool
+# versions identical to the production build.
+COPY --chown=deeptutor:deeptutor --from=frontend-builder /app/web-vue3 ./web-vue3
+RUN chown -R deeptutor:deeptutor /app/web-vue3
 
 # Install development tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -586,7 +561,7 @@ RUN pip install --no-cache-dir \
     ruff
 
 # Development overrides only the program definitions (uvicorn --reload and
-# `next dev`); the shared daemon-level /etc/supervisor/supervisord.conf from
+# Vite); the shared daemon-level /etc/supervisor/supervisord.conf from
 # the production stage is reused as-is.
 RUN cat > /etc/supervisor/conf.d/programs.conf <<'EOF'
 [program:backend]
@@ -602,8 +577,8 @@ stderr_logfile_maxbytes=0
 environment=PYTHONPATH="/app",PYTHONUNBUFFERED="1"
 
 [program:frontend]
-command=/bin/bash -c "cd /app/web && node scripts/dev.mjs -H 0.0.0.0 -p ${FRONTEND_PORT:-3782}"
-directory=/app/web
+command=/bin/bash -c "cd /app/web-vue3 && npx vite --host 0.0.0.0 --port ${FRONTEND_PORT:-3782}"
+directory=/app/web-vue3
 user=deeptutor
 autostart=true
 autorestart=true

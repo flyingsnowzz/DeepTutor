@@ -508,6 +508,7 @@ def _install_request_workspace(request) -> None:
             ("GET", "/api/auth/devices"),
             ("POST", "/api/auth/devices"),
             ("POST", "/api/auth/device/heartbeat"),
+            ("POST", "/api/auth/session-handoff"),
         }
         avatar_read = method == "GET" and path.startswith("/api/auth/avatar/")
         user_detail = path.startswith("/api/auth/users/") and (
@@ -688,6 +689,31 @@ _PERSONAL_PAGE_ROUTES = frozenset(
 )
 
 
+_PERSONAL_MODEL_SETTING_ROUTES = frozenset(
+    {
+        # Personal model catalogs are stored and resolved in the caller's own
+        # scope. They do not expose the administrator's shared credentials.
+        ("GET", "/api/settings"),
+        ("GET", "/api/settings/catalog"),
+        ("PUT", "/api/settings/catalog"),
+        ("GET", "/api/settings/draft"),
+        ("POST", "/api/settings/apply"),
+        ("POST", "/api/settings/apply/registry"),
+        ("POST", "/api/settings/apply/provider"),
+        ("POST", "/api/settings/apply/service"),
+        ("POST", "/api/settings/test-provider"),
+        ("POST", "/api/settings/fetch-models"),
+        ("POST", "/api/settings/model-capabilities"),
+        ("POST", "/api/settings/voice/voices"),
+        ("POST", "/api/settings/voice/preview"),
+        ("POST", "/api/settings/services/{service}/preview"),
+        ("POST", "/api/settings/tests/{service}/start"),
+        ("GET", "/api/settings/tests/{service}/{run_id}/events"),
+        ("POST", "/api/settings/tests/{service}/{run_id}/cancel"),
+    }
+)
+
+
 _LEARNER_SETTINGS_WRITE_ROUTES = frozenset(
     {
         # UI preferences resolve through the per-user path service into the
@@ -695,8 +721,9 @@ _LEARNER_SETTINGS_WRITE_ROUTES = frozenset(
         # safe for learning accounts.
         ("PUT", "/api/settings/ui"),
         *_PERSONAL_PAGE_ROUTES,
-        # Per-user settings draft document. Applying a draft to the runtime
-        # catalog stays admin-gated in the endpoint itself.
+        *_PERSONAL_MODEL_SETTING_ROUTES,
+        # Per-user settings draft document and personal model catalog.
+        # Deployment administration routes stay denied by this default-deny list.
         ("PUT", "/api/settings/draft"),
         ("DELETE", "/api/settings/draft"),
         # Workspace self-management: the caller's own registrations inside
@@ -1116,7 +1143,17 @@ async def create_session_handoff(
             # before a valid pairing code is presented.
             "exp": now + CODE_LIFETIME_SECONDS + TICKET_LIFETIME_SECONDS,
         }
-        if POCKETBASE_ENABLED:
+        if postgres_accounts_enabled():
+            ticket_claims.update(
+                {
+                    "mode": "postgres_admin" if payload.role == "admin" else "postgres_user",
+                    "username": payload.username,
+                    "user_id": payload.user_id,
+                    "device_credential_id": payload.device_credential_id,
+                    "device_session_nonce": payload.device_session_nonce,
+                }
+            )
+        elif POCKETBASE_ENABLED:
             ticket_claims.update(
                 {"mode": "pocketbase", "token": _extract_token(authorization, dt_token)}
             )
@@ -1170,9 +1207,6 @@ async def exchange_session_handoff(
     response: Response,
 ) -> dict:
     """Consume a pairing code and return a short-lived ticket in the response body."""
-    if postgres_accounts_enabled():
-        raise HTTPException(status_code=501, detail="Session handoff is not available yet")
-
     _no_store(response)
     host = _request_frontend_host(request)
     if not host:
@@ -1206,9 +1240,6 @@ async def complete_session_handoff(
     response: Response,
 ) -> dict:
     """Consume a ticket once and issue the normal HttpOnly session cookie."""
-    if postgres_accounts_enabled():
-        raise HTTPException(status_code=501, detail="Session handoff is not available yet")
-
     _no_store(response)
     host = _request_frontend_host(request)
     if not host:
@@ -1232,11 +1263,11 @@ async def complete_session_handoff(
             raise HandoffRejected("Invalid handoff ticket")
 
         mode = str(claims.get("mode"))
-        if mode == "pocketbase":
+        if mode == "pocketbase" and POCKETBASE_ENABLED:
             token = str(claims.get("token") or "")
             if not token or decode_token(token) is None:
                 raise HandoffRejected("Invalid handoff ticket")
-        elif mode == "builtin":
+        elif mode == "builtin" and not postgres_accounts_enabled() and not POCKETBASE_ENABLED:
             token = create_token(
                 str(claims.get("username") or ""),
                 str(claims.get("role") or "user"),
@@ -1244,6 +1275,33 @@ async def complete_session_handoff(
                 device_credential_id=str(claims.get("device_credential_id") or ""),
                 device_session_nonce=str(claims.get("device_session_nonce") or ""),
             )
+        elif mode in {"postgres_user", "postgres_admin"} and postgres_accounts_enabled():
+            gateway = get_postgres_web_account_gateway()
+            user_id = str(claims.get("user_id") or "")
+            username = str(claims.get("username") or "")
+            if not user_id or not username:
+                raise HandoffRejected("Invalid handoff ticket")
+            if mode == "postgres_user":
+                account = await gateway.users.get_user(user_id)
+                if account is None or account["username"] != username:
+                    raise HandoffRejected("Invalid handoff ticket")
+                device_id = str(claims.get("device_credential_id") or "")
+                device_nonce = str(claims.get("device_session_nonce") or "")
+                if device_id:
+                    from deeptutor.multi_user.device_credentials import validate_device_token
+
+                    if not validate_device_token(user_id, device_id, device_nonce):
+                        raise HandoffRejected("Invalid handoff ticket")
+                token = gateway.issue_user_token(
+                    account,
+                    device_credential_id=device_id,
+                    device_session_nonce=device_nonce,
+                )
+            else:
+                account = await gateway.admins.get_admin(user_id)
+                if account is None or account["username"] != username:
+                    raise HandoffRejected("Invalid handoff ticket")
+                token = gateway.issue_admin_token(account)
         else:
             raise HandoffRejected("Invalid handoff ticket")
     except HandoffRateLimited:

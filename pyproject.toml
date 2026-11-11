@@ -132,7 +132,7 @@ deeptutor = [
     "**/*.mjs",
 ]
 deeptutor_cli = ["**/*.md"]
-deeptutor_web = ["**/*", ".next/**/*"]
+deeptutor_web = ["**/*", "dist/**/*"]
 
 # ============================================
 # Black code formatter configuration

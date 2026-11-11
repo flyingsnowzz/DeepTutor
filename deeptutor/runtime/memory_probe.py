@@ -8,7 +8,7 @@ Two things make "how much memory does DeepTutor use" more than one ``getrusage``
 call:
 
 * The backend is only one of the processes. ``deeptutor.runtime.launcher``
-  spawns the Next.js frontend as a *sibling* (see ``_spawn``), and capabilities
+  spawns the Vue 3 frontend as a *sibling* (see ``_spawn``), and capabilities
   spawn sandboxes and subagent CLIs below it. Answering honestly means walking
   the supervisor's process tree, which is why the launcher stamps its own pid
   into :data:`SUPERVISOR_PID_ENV` — without that anchor a bare

@@ -50,7 +50,7 @@ from deeptutor.api.routers.auth import _learning_surface_for_path
         ("/api/knowledge-bases", "POST", ""),
         ("/api/knowledge-bases/kb1/upload", "POST", ""),
         ("/api/knowledge-bases/kb1/files/a.pdf", "DELETE", ""),
-        # Everything else still default-denies.
+        # Personal model catalogs are allowed; unrelated settings stay denied.
         ("/api/settings", "GET", ""),
         # Model choice for a chat turn. Not a prefix: other settings stay denied.
         ("/api/settings/llm-options", "GET", "chat"),
@@ -155,7 +155,11 @@ def test_learner_kb_get_allowlist(path: str, route_path: str, expected: str) -> 
         ),
         # Admin-grade neighbors under the same prefixes stay denied.
         ("/api/settings/ui", "POST", "/api/settings/ui", ""),
-        ("/api/settings/draft", "GET", "/api/settings/draft", ""),
+        ("/api/settings", "GET", "/api/settings", "chat"),
+        ("/api/settings/draft", "GET", "/api/settings/draft", "chat"),
+        ("/api/settings/catalog", "PUT", "/api/settings/catalog", "chat"),
+        ("/api/settings/apply/service", "POST", "/api/settings/apply/service", "chat"),
+        ("/api/settings/test-provider", "POST", "/api/settings/test-provider", "chat"),
         (
             "/api/settings/workspace/registrations",
             "GET",

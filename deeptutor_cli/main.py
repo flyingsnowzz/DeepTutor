@@ -128,7 +128,7 @@ def start(
     dev: bool = typer.Option(
         False,
         "--dev",
-        help="Use the Next.js development server for frontend work.",
+        help="Use the Vite development server for frontend work.",
     ),
     detach: bool = typer.Option(
         False,
@@ -215,7 +215,7 @@ def serve(
         port=port,
         reload=reload,
         workers=backend_workers,
-        reload_excludes=["web/*", "data/*"] if reload else None,
+        reload_excludes=["web/*", "web-vue3/*", "data/*"] if reload else None,
         # Keep request.client tied to the actual peer; XFF is client-controlled
         # unless the deployment explicitly provides a trusted proxy.
         proxy_headers=False,

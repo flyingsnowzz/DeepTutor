@@ -17,6 +17,7 @@ on:
       - "requirements.txt"
       - "pyproject.toml"
       - "web/**"
+      - "web-vue3/**"
       - "packages/chat-engine/**"
       - ".github/workflows/tests.yml"
   pull_request:
@@ -32,6 +33,7 @@ on:
       - "requirements.txt"
       - "pyproject.toml"
       - "web/**"
+      - "web-vue3/**"
       - "packages/chat-engine/**"
       - ".github/workflows/tests.yml"
 
@@ -111,6 +113,45 @@ jobs:
         run: |
           lint-imports
           python scripts/check_architecture.py
+
+  vue3-frontend:
+    name: Vue 3 frontend
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web-vue3/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: web-vue3
+        run: npm ci
+      - name: Run component and helper tests
+        working-directory: web-vue3
+        run: npm run test:unit
+      - name: Test production static server
+        working-directory: web-vue3
+        run: npm run test:server
+      - name: Typecheck and build production assets
+        working-directory: web-vue3
+        run: npm run build
+      - name: Verify route inventory
+        working-directory: web-vue3
+        run: npm run routes:status
+      - name: Install Playwright Chromium
+        working-directory: web-vue3
+        run: npx playwright install --with-deps chromium
+      - name: Run deterministic browser workflows
+        working-directory: web-vue3
+        run: npm run test:e2e
+      - name: Upload browser evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vue3-browser-evidence
+          path: web-vue3/test-results
+          if-no-files-found: ignore
 
   web-tests:
     name: Web Node Tests
@@ -437,7 +478,7 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-24.04
-    needs: [chat-engine, lint, web-tests, multi-worker-web, import-check, python-tests, postgres-integration, video-lesson-sandbox]
+    needs: [chat-engine, lint, vue3-frontend, web-tests, multi-worker-web, import-check, python-tests, postgres-integration, video-lesson-sandbox]
     if: always()
 
     steps:
@@ -450,6 +491,7 @@ jobs:
           echo "| TypeScript chat engine | ${{ needs.chat-engine.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Video lesson isolation | ${{ needs.video-lesson-sandbox.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Lint and format | ${{ needs.lint.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Vue 3 frontend | ${{ needs.vue3-frontend.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Web node tests | ${{ needs.web-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Four-worker browser acceptance | ${{ needs.multi-worker-web.result == 'success' && '✅ Passed' || needs.multi-worker-web.result == 'skipped' && '⏭️ Fixture not configured' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Import/lazy/worker check (3.11–3.14; 3.14 on Linux/macOS/Windows) | ${{ needs.import-check.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
@@ -457,5 +499,5 @@ jobs:
           echo "| PostgreSQL platform integration | ${{ needs.postgres-integration.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
 
       - name: Fail if tests failed
-        if: needs.video-lesson-sandbox.result != 'success' || needs.chat-engine.result == 'failure' || needs.lint.result == 'failure' || needs.web-tests.result == 'failure' || needs.multi-worker-web.result == 'failure' || needs.import-check.result == 'failure' || needs.python-tests.result == 'failure' || needs.postgres-integration.result == 'failure'
+        if: needs.video-lesson-sandbox.result != 'success' || needs.chat-engine.result == 'failure' || needs.lint.result == 'failure' || needs.vue3-frontend.result == 'failure' || needs.web-tests.result == 'failure' || needs.multi-worker-web.result == 'failure' || needs.import-check.result == 'failure' || needs.python-tests.result == 'failure' || needs.postgres-integration.result == 'failure'
         run: exit 1

@@ -41,6 +41,19 @@ def load(user_id: str) -> dict[str, Any] | None:
     return row[0] if row else None
 
 
+def load_for_guardian(user_id: str, required_permission: str) -> dict[str, Any] | None:
+    from deeptutor.multi_user.guardians import guardian_can_access
+
+    actor = get_current_user_or_none()
+    if actor is None or not guardian_can_access(actor.id, user_id, required_permission):
+        raise PermissionError("Guardian authorization required")
+    url = database_url().replace("postgresql+asyncpg://", "postgresql://", 1)
+    with psycopg.connect(url) as db:
+        db.execute("SELECT set_config('app.user_id', %s, true)", (user_id,))
+        row = db.execute("SELECT grant_json FROM user_grants WHERE owner_user_id=%s", (user_id,)).fetchone()
+    return row[0] if row else None
+
+
 def save(user_id: str, grant: dict[str, Any]) -> PostgresGrantWriteReceipt:
     auth_url = authentication_database_url().replace("postgresql+asyncpg://", "postgresql://", 1)
     with psycopg.connect(auth_url) as auth_db:

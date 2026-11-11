@@ -101,30 +101,18 @@ def test_port_probe_detects_ipv6_only_loopback_listener(monkeypatch) -> None:
     assert attempts == [("127.0.0.1", 3782), ("::1", 3782)]
 
 
-def test_packaged_web_cache_replaces_next_public_placeholders(tmp_path: Path) -> None:
+def test_packaged_web_cache_copies_vue_assets_without_url_patching(tmp_path: Path) -> None:
     packaged = tmp_path / "pkg"
-    (packaged / ".next" / "static").mkdir(parents=True)
-    (packaged / "server.js").write_text(
-        "const api='__NEXT_PUBLIC_API_BASE_PLACEHOLDER__';",
-        encoding="utf-8",
-    )
-    (packaged / ".next" / "static" / "app.js").write_text(
-        "auth='__NEXT_PUBLIC_AUTH_ENABLED_PLACEHOLDER__'",
-        encoding="utf-8",
-    )
+    (packaged / "dist").mkdir(parents=True)
+    (packaged / "server.mjs").write_text("const api = process.env.DEEPTUTOR_API_ORIGIN;", encoding="utf-8")
+    (packaged / "dist" / "index.html").write_text("<div id=app></div>", encoding="utf-8")
 
     runtime = launcher._copy_packaged_web_if_needed(
-        packaged,
-        home=tmp_path / "home",
-        api_base="http://localhost:8001",
-        auth_enabled=True,
+        packaged, home=tmp_path / "home", api_base="http://localhost:8001", auth_enabled=True,
     )
 
-    assert (runtime / "server.js").read_text(encoding="utf-8") == (
-        "const api='http://localhost:8001';"
-    )
-    assert "auth='true'" in (runtime / ".next" / "static" / "app.js").read_text(encoding="utf-8")
-
+    assert (runtime / "server.mjs").read_text(encoding="utf-8") == "const api = process.env.DEEPTUTOR_API_ORIGIN;"
+    assert (runtime / "dist" / "index.html").is_file()
 
 def test_runtime_home_rejects_project_data_paths(monkeypatch, tmp_path: Path) -> None:
     package_root = tmp_path / "package"
@@ -246,31 +234,17 @@ def test_launcher_completes_update_only_after_restart(tmp_path: Path) -> None:
     assert store.load().status == "succeeded"
 
 
-def test_packaged_web_cache_refreshes_when_public_settings_change(tmp_path: Path) -> None:
+def test_packaged_web_cache_is_independent_of_runtime_backend_settings(tmp_path: Path) -> None:
     packaged = tmp_path / "pkg"
-    (packaged / ".next").mkdir(parents=True)
-    (packaged / "server.js").write_text(
-        "const api='__NEXT_PUBLIC_API_BASE_PLACEHOLDER__';",
-        encoding="utf-8",
-    )
+    packaged.mkdir()
+    (packaged / "server.mjs").write_text("const api = process.env.DEEPTUTOR_API_ORIGIN;", encoding="utf-8")
     home = tmp_path / "home"
 
-    first = launcher._copy_packaged_web_if_needed(
-        packaged,
-        home=home,
-        api_base="http://localhost:8001",
-        auth_enabled=False,
-    )
-    second = launcher._copy_packaged_web_if_needed(
-        packaged,
-        home=home,
-        api_base="https://api.example",
-        auth_enabled=False,
-    )
+    first = launcher._copy_packaged_web_if_needed(packaged, home=home, api_base="http://localhost:8001", auth_enabled=False)
+    second = launcher._copy_packaged_web_if_needed(packaged, home=home, api_base="https://api.example", auth_enabled=False)
 
     assert first == second
-    assert "https://api.example" in (second / "server.js").read_text(encoding="utf-8")
-
+    assert "api.example" not in (second / "server.mjs").read_text(encoding="utf-8")
 
 def test_detect_existing_source_frontend_from_next_dev_lock(tmp_path: Path, monkeypatch) -> None:
     source = tmp_path / "web"
@@ -364,7 +338,7 @@ def test_reclaim_requires_same_deployment_and_dead_launcher(tmp_path, monkeypatc
         cwd=backend.cwd,
     )
     if role == "start.frontend":
-        process.cmdline = lambda: ["next-server (v16.2.3)"]
+        process.cmdline = lambda: ["node", "server.mjs"]
         process.exe = lambda: "/usr/local/bin/node"
         process.cwd = lambda: str(frontend)
     elif role == "backend_worker":
@@ -487,6 +461,8 @@ def test_noninteractive_restart_recovers_an_actual_orphaned_backend_listener(tmp
     env = os.environ.copy()
     env[launcher.DEEPTUTOR_HOME_ENV] = str(tmp_path)
     env.pop("PYTHONPATH", None)
+    env.pop(launcher.SUPERVISOR_PID_ENV, None)
+    env.pop(launcher.LAUNCHER_PID_ENV, None)
     child = psutil.Process(
         int(
             subprocess.check_output(
@@ -718,9 +694,8 @@ def test_source_frontend_defaults_to_cached_production_build(
     )
 
     assert runtime.kind == "source-production"
-    standalone = source / launcher.SOURCE_PRODUCTION_DIST_DIR / "standalone"
-    assert runtime.command == ["/bin/node", str(standalone / "server.js")]
-    assert runtime.cwd == standalone
+    assert runtime.command == ["/bin/node", str(source / "server.mjs")]
+    assert runtime.cwd == source
     assert builds == [(source, "/bin/npm", "http://localhost:8001", True)]
 
 
@@ -756,49 +731,33 @@ def test_source_frontend_dev_mode_is_explicit_and_skips_production_build(
 def test_source_production_build_is_reused_until_an_input_changes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    source = tmp_path / "web"
-    source.mkdir()
-    (source / "package.json").write_text('{"scripts":{"build":"next build"}}', encoding="utf-8")
-    next_env = source / "next-env.d.ts"
-    next_env.write_text("// developer dist types\n", encoding="utf-8")
-    app = source / "app"
-    app.mkdir()
-    page = app / "page.tsx"
-    page.write_text("export default function Page() { return null; }", encoding="utf-8")
+    source = tmp_path / "web-vue3"
+    (source / "src").mkdir(parents=True)
+    (source / "node_modules").mkdir()
+    (source / "package.json").write_text('{"scripts":{"build":"vite build"}}', encoding="utf-8")
+    page = source / "src" / "page.ts"
+    page.write_text("export const page = null", encoding="utf-8")
     calls: list[tuple[list[str], Path, str]] = []
 
     def _run(command, cwd, env, **_kwargs):
-        calls.append((list(command), Path(cwd), env["DEEPTUTOR_NEXT_DIST_DIR"]))
-        next_env.write_text("// production dist types\n", encoding="utf-8")
+        calls.append((list(command), Path(cwd), env["DEEPTUTOR_API_ORIGIN"]))
         dist = source / launcher.SOURCE_PRODUCTION_DIST_DIR
-        (dist / "standalone").mkdir(parents=True, exist_ok=True)
-        (dist / "BUILD_ID").write_text(f"build-{len(calls)}", encoding="utf-8")
-        (dist / "standalone" / "server.js").write_text("", encoding="utf-8")
+        dist.mkdir(exist_ok=True)
+        (dist / "index.html").write_text(f"build-{len(calls)}", encoding="utf-8")
         return _CompletedProcess(0)
 
     monkeypatch.setattr(launcher.subprocess, "run", _run)
 
     for _ in range(2):
-        launcher._ensure_source_production_build(
-            source,
-            "npm",
-            api_base="http://localhost:8001",
-            auth_enabled=False,
-        )
+        launcher._ensure_source_production_build(source, "npm", api_base="http://localhost:8001", auth_enabled=False)
 
-    page.write_text("export default function Page() { return <main />; }", encoding="utf-8")
-    launcher._ensure_source_production_build(
-        source,
-        "npm",
-        api_base="http://localhost:8001",
-        auth_enabled=False,
-    )
+    page.write_text("export const page = 'changed'", encoding="utf-8")
+    launcher._ensure_source_production_build(source, "npm", api_base="http://localhost:8001", auth_enabled=False)
 
     assert calls == [
-        (["npm", "run", "build"], source, launcher.SOURCE_PRODUCTION_DIST_DIR),
-        (["npm", "run", "build"], source, launcher.SOURCE_PRODUCTION_DIST_DIR),
+        (["npm", "run", "build"], source, "http://localhost:8001"),
+        (["npm", "run", "build"], source, "http://localhost:8001"),
     ]
-    assert next_env.read_text(encoding="utf-8") == "// developer dist types\n"
 
 
 @pytest.mark.parametrize("resolved_backend_port", [8001, 8123])
@@ -882,8 +841,7 @@ def test_start_uses_ipv4_loopback_for_frontend_proxy(
     assert captured_envs["frontend"]["DEEPTUTOR_API_BASE_URL"] == (
         f"http://127.0.0.1:{resolved_backend_port}"
     )
-    assert "DEEPTUTOR_NEXT_DIST_DIR" not in captured_envs["backend"]
-    assert "DEEPTUTOR_NEXT_DIST_DIR" not in captured_envs["frontend"]
+    assert captured_envs["frontend"]["DEEPTUTOR_API_ORIGIN"] == f"http://127.0.0.1:{resolved_backend_port}"
     assert launcher.DETACHED_WORKER_ENV not in captured_envs["backend"]
     assert launcher.DETACHED_TOKEN_ENV not in captured_envs["backend"]
     assert termination_order == ["backend", "frontend"]

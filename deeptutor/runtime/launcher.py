@@ -65,7 +65,7 @@ KILL_SIGNAL = getattr(signal, "SIGKILL", signal.SIGTERM)
 SHUTDOWN_GRACE_SECONDS = 3.0
 SHUTDOWN_REAP_SECONDS = 1.0
 WEB_CACHE_DIR = Path("data") / "user" / "runtime" / "web"
-SOURCE_PRODUCTION_DIST_DIR = ".next-deeptutor"
+SOURCE_PRODUCTION_DIST_DIR = "dist"
 SOURCE_BUILD_MARKER = ".deeptutor-build.json"
 SOURCE_BUILD_EXCLUDED_DIRS = {
     "node_modules",
@@ -700,18 +700,26 @@ def _owned_orphan_started_at(
                     args[i : i + 3] == ["-m", "uvicorn", "deeptutor.api.main:app"]
                     for i in range(len(args) - 2)
                 ):
-                    if (
-                        Path(candidate.exe()).resolve() == Path(sys.executable).resolve()
-                        and Path(candidate.cwd()).resolve() == runtime_home.resolve()
-                    ):
+                    # macOS framework launches use Resources/Python.app/.../Python
+                    # while sys.executable resolves to the sibling python3.x binary.
+                    # Both are the installation's Python launcher; require the same
+                    # interpreter family while retaining cwd/env/command fencing.
+                    candidate_executable = Path(candidate.exe()).resolve()
+                    current_executable = Path(sys.executable).resolve()
+                    same_interpreter = candidate_executable == current_executable or (
+                        candidate_executable.stem.lower() == "python"
+                        and "Python.app" in candidate_executable.parts
+                        and current_executable.stem.lower().startswith("python")
+                    )
+                    if same_interpreter and Path(candidate.cwd()).resolve() == runtime_home.resolve():
                         return process.create_time()
         elif frontend_cwd is not None:
             cwd = Path(process.cwd()).resolve()
             args = process.cmdline()
             if cwd != frontend_cwd.resolve() or Path(process.exe()).stem.lower() != "node":
                 return None
-            if any(arg.startswith("next-server (") for arg in args) or any(
-                Path(arg).name == "server.js" and (cwd / arg).resolve() == cwd / "server.js"
+            if any(
+                Path(arg).name == "server.mjs" and (cwd / arg).resolve() == cwd / "server.mjs"
                 for arg in args
             ):
                 return process.create_time()
@@ -839,7 +847,7 @@ def _packaged_web_dir() -> Path | None:
     except ImportError:
         return None
     path = Path(deeptutor_web.__file__).resolve().parent
-    return path if (path / "server.js").exists() else None
+    return path if (path / "server.mjs").exists() else None
 
 
 def _copy_packaged_web_if_needed(
@@ -849,41 +857,31 @@ def _copy_packaged_web_if_needed(
     api_base: str,
     auth_enabled: bool,
 ) -> Path:
-    """Copy packaged Next.js standalone files into a writable runtime cache.
+    """Copy the packaged Vue static server into a writable runtime cache.
 
-    Next public variables are inlined at build time, so placeholders must be
-    replaced before ``server.js`` starts. The installed package may live in a
-    read-only site-packages directory; the cache keeps mutation local to the
-    active workspace.
+    The Vue build contains no deployment-specific URLs. The Node server reads
+    the backend origin from the process environment on every launch, so a
+    cached copy only needs to change when the installed asset itself changes.
     """
 
     cache = home / WEB_CACHE_DIR
     marker = cache / ".deeptutor-web-runtime.json"
-    source_server = packaged / "server.js"
+    source_server = packaged / "server.mjs"
     marker_payload = {
         "source": str(packaged),
         "source_mtime_ns": source_server.stat().st_mtime_ns,
-        "api_base": api_base,
-        "auth_enabled": bool(auth_enabled),
     }
-    if (cache / "server.js").exists():
+    if (cache / "server.mjs").exists():
         try:
             if json.loads(marker.read_text(encoding="utf-8")) == marker_payload:
                 return cache
         except Exception:
             pass
-
     if cache.exists():
         shutil.rmtree(cache)
     shutil.copytree(packaged, cache)
-    _patch_packaged_web_placeholders(
-        cache,
-        api_base=api_base,
-        auth_enabled="true" if auth_enabled else "false",
-    )
     marker.write_text(json.dumps(marker_payload, indent=2), encoding="utf-8")
     return cache
-
 
 def _patch_packaged_web_placeholders(
     web_dir: Path,
@@ -913,7 +911,7 @@ def _patch_packaged_web_placeholders(
 
 
 def _source_web_dir(home: Path) -> Path | None:
-    candidates = [home / "web", PACKAGE_ROOT / "web"]
+    candidates = [home / "web-vue3", PACKAGE_ROOT / "web-vue3"]
     for path in candidates:
         if (path / "package.json").exists():
             return path
@@ -921,7 +919,7 @@ def _source_web_dir(home: Path) -> Path | None:
 
 
 def _ensure_web_dependencies(source: Path, npm: str) -> None:
-    """Install ``web/node_modules`` on a source checkout that has none.
+    """Install ``web-vue3/node_modules`` on a source checkout that has none.
 
     ``pip install -e ".[cli]"`` never touches npm, so a fresh clone would hand
     the dev server a missing ``next`` binary and die on Node's MODULE_NOT_FOUND
@@ -933,7 +931,7 @@ def _ensure_web_dependencies(source: Path, npm: str) -> None:
     if (source / "node_modules").exists():
         return
     action = "ci" if (source / "package-lock.json").exists() else "install"
-    _log(f"web/node_modules not found — running `npm {action}` in {source} ...")
+    _log(f"web-vue3/node_modules not found — running `npm {action}` in {source} ...")
     result = subprocess.run([npm, action], cwd=source, **_no_window_kwargs())
     if result.returncode != 0:
         raise SystemExit(
@@ -943,54 +941,30 @@ def _ensure_web_dependencies(source: Path, npm: str) -> None:
 
 
 def _source_production_env(*, api_base: str, auth_enabled: bool) -> dict[str, str]:
-    """Environment shared by the source production build and server."""
+    """Environment shared by the Vue production build and static server."""
 
     env = os.environ.copy()
-    env["DEEPTUTOR_NEXT_DIST_DIR"] = SOURCE_PRODUCTION_DIST_DIR
-    env["NEXT_PUBLIC_API_BASE"] = api_base
-    env["NEXT_PUBLIC_AUTH_ENABLED"] = "true" if auth_enabled else "false"
+    env["DEEPTUTOR_API_ORIGIN"] = api_base
     return env
 
 
-def _source_build_fingerprint(source: Path, env: dict[str, str]) -> str:
-    """Hash source inputs and build-time public settings for build reuse."""
+def _source_build_fingerprint(source: Path) -> str:
+    """Hash every Vue source input that can change the production bundle."""
 
     digest = hashlib.sha256()
-    for key in (
-        "DEEPTUTOR_NEXT_DIST_DIR",
-        "NEXT_PUBLIC_API_BASE",
-        "NEXT_PUBLIC_AUTH_ENABLED",
-    ):
-        digest.update(key.encode("utf-8"))
-        digest.update(b"\0")
-        digest.update(env.get(key, "").encode("utf-8"))
-        digest.update(b"\0")
-
-    version_file = PACKAGE_ROOT / "deeptutor" / "__version__.py"
-    candidates: list[Path] = []
-    for dirpath, dirnames, filenames in os.walk(source):
-        dirnames[:] = sorted(
-            name
-            for name in dirnames
-            if name not in SOURCE_BUILD_EXCLUDED_DIRS and not name.startswith(".next")
-        )
-        root = Path(dirpath)
-        candidates.extend(root / name for name in sorted(filenames))
-    if version_file.is_file():
-        candidates.append(version_file)
-
-    for path in candidates:
-        relative = (
-            path.relative_to(source).as_posix()
-            if path.is_relative_to(source)
-            else f"../deeptutor/{path.name}"
-        )
-        digest.update(relative.encode("utf-8"))
-        digest.update(b"\0")
-        with path.open("rb") as stream:
-            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-                digest.update(chunk)
-        digest.update(b"\0")
+    roots = [source / "src", source / "public"]
+    files = [source / name for name in (
+        "package.json", "package-lock.json", "tsconfig.json", "vite.config.ts",
+        "index.html", "server.mjs",
+    )]
+    for root in roots:
+        if root.exists():
+            files.extend(path for path in root.rglob("*") if path.is_file())
+    for path in sorted(set(files), key=lambda item: str(item)):
+        if not path.is_file():
+            continue
+        digest.update(str(path.relative_to(source)).encode())
+        digest.update(path.read_bytes())
     return digest.hexdigest()
 
 
@@ -1000,74 +974,34 @@ def _ensure_source_production_build(
     *,
     api_base: str,
     auth_enabled: bool,
-) -> None:
-    """Build source installs once, then reuse them until an input changes.
+) -> Path:
+    """Build ``web-vue3/dist`` once per source fingerprint."""
 
-    Long-running ``deeptutor start`` processes must not use ``next dev``: its
-    compiler and HMR caches are development machinery, and a v1.5.7 deployment
-    grew past 14 GB before V8 aborted.  A dedicated dist directory lets an
-    explicit ``--dev`` server keep using ``.next`` without either mode erasing
-    the other's output.
-    """
-
-    env = _source_production_env(api_base=api_base, auth_enabled=auth_enabled)
     dist = source / SOURCE_PRODUCTION_DIST_DIR
     marker = dist / SOURCE_BUILD_MARKER
-    payload = {"fingerprint": _source_build_fingerprint(source, env)}
-    if (dist / "BUILD_ID").is_file() and (dist / "standalone" / "server.js").is_file():
+    payload = {"fingerprint": _source_build_fingerprint(source)}
+    if (dist / "index.html").is_file():
         try:
             if json.loads(marker.read_text(encoding="utf-8")) == payload:
-                _prepare_source_standalone(source)
-                return
+                return dist
         except Exception:
             pass
-
-    _log(f"Building the source frontend for production in {source} ...")
-    # Next rewrites these source-controlled files to point at whichever dist
-    # directory was built most recently. Preserve the developer's versions so
-    # a production launch neither dirties the checkout nor breaks the next
-    # explicit ``--dev`` typecheck.
-    generated_config = [source / "next-env.d.ts", source / "tsconfig.json"]
-    snapshots = {path: path.read_bytes() if path.is_file() else None for path in generated_config}
-    try:
-        result = subprocess.run([npm, "run", "build"], cwd=source, env=env, **_no_window_kwargs())
-    finally:
-        for path, original in snapshots.items():
-            if original is None:
-                path.unlink(missing_ok=True)
-            elif not path.is_file() or path.read_bytes() != original:
-                path.write_bytes(original)
+    _ensure_web_dependencies(source, npm)
+    _log(f"Building the Vue 3 source frontend for production in {source} ...")
+    result = subprocess.run(
+        [npm, "run", "build"], cwd=source,
+        env=_source_production_env(api_base=api_base, auth_enabled=auth_enabled),
+        **_no_window_kwargs(),
+    )
     if result.returncode != 0:
         raise SystemExit(
             f"`npm run build` failed (exit {result.returncode}). "
             "Fix the error above, then retry `deeptutor start`."
         )
-    if not (dist / "BUILD_ID").is_file():
-        raise SystemExit(f"`npm run build` completed without creating {dist / 'BUILD_ID'}.")
-    _prepare_source_standalone(source)
+    if not (dist / "index.html").is_file():
+        raise SystemExit(f"`npm run build` completed without creating {dist / 'index.html'}.")
     marker.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-
-
-def _prepare_source_standalone(source: Path) -> Path:
-    """Add static/public assets omitted from Next's standalone directory."""
-
-    dist = source / SOURCE_PRODUCTION_DIST_DIR
-    standalone = dist / "standalone"
-    if not (standalone / "server.js").is_file():
-        raise SystemExit(
-            f"`npm run build` did not create the standalone server at {standalone / 'server.js'}."
-        )
-    static = dist / "static"
-    if static.is_dir():
-        shutil.copytree(
-            static,
-            standalone / SOURCE_PRODUCTION_DIST_DIR / "static",
-            dirs_exist_ok=True,
-        )
-    public = source / "public"
-    if public.is_dir():
-        shutil.copytree(public, standalone / "public", dirs_exist_ok=True)
-    return standalone
+    return dist
 
 
 def _resolve_frontend(
@@ -1082,47 +1016,37 @@ def _resolve_frontend(
     node = shutil.which("node")
     if packaged is not None:
         if not node:
-            raise SystemExit("Node.js 20+ is required to run the packaged DeepTutor Web app.")
+            raise SystemExit("Node.js 22+ is required to run the packaged DeepTutor Vue app.")
         runtime_web = _copy_packaged_web_if_needed(
-            packaged,
-            home=home,
-            api_base=api_base,
-            auth_enabled=auth_enabled,
+            packaged, home=home, api_base=api_base, auth_enabled=auth_enabled,
         )
-        return FrontendRuntime("packaged", [node, str(runtime_web / "server.js")], runtime_web)
+        return FrontendRuntime("packaged", [node, str(runtime_web / "server.mjs")], runtime_web)
 
     source = _source_web_dir(home)
     if source is not None:
         npm = shutil.which("npm")
         if not npm:
             raise SystemExit(
-                "npm not found. Source installs require Node.js/npm and `cd web && npm install`."
+                "npm not found. Source installs require Node.js 22/npm and `cd web-vue3 && npm ci`."
             )
         _ensure_web_dependencies(source, npm)
         if not dev:
             if not node:
-                raise SystemExit("Node.js 20+ is required to run the source production build.")
+                raise SystemExit("Node.js 22+ is required to run the Vue production build.")
             _ensure_source_production_build(
-                source,
-                npm,
-                api_base=api_base,
-                auth_enabled=auth_enabled,
+                source, npm, api_base=api_base, auth_enabled=auth_enabled,
             )
-            standalone = source / SOURCE_PRODUCTION_DIST_DIR / "standalone"
             return FrontendRuntime(
-                "source-production",
-                [node, str(standalone / "server.js")],
-                standalone,
+                "source-production", [node, str(source / "server.mjs")], source,
             )
         return FrontendRuntime(
-            "source", [npm, "run", "dev", "--", "--port", str(frontend_port)], source
+            "source", [npm, "run", "dev", "--", "--port", str(frontend_port)], source,
         )
 
     raise SystemExit(
-        "DeepTutor Web assets are not installed. Install the full app with `pip install -U deeptutor`, "
-        "or run from a source checkout that contains `web/`."
+        "DeepTutor Vue assets are not installed. Install the full app with `pip install -U deeptutor`, "
+        "or run from a source checkout that contains `web-vue3/`."
     )
-
 
 def _coerce_pid(value: object) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int | str):
@@ -1163,7 +1087,7 @@ def _local_app_url(value: object, port: int) -> str:
 
 
 def _detect_existing_source_frontend(frontend: FrontendRuntime) -> ExistingFrontendRuntime | None:
-    """Return an already-running Next dev server for this source checkout."""
+    """Return an already-running Vite dev server for this source checkout."""
 
     if frontend.kind != "source":
         return None
@@ -1214,16 +1138,16 @@ def _process_command(pid: int | None) -> str:
     return (completed.stdout or "").strip()
 
 
-def _looks_like_next_process(pid: int | None) -> bool:
+def _looks_like_frontend_process(pid: int | None) -> bool:
     command = _process_command(pid).lower()
     return bool(
         command
-        and ("next-server" in command or "next/dist/bin/next" in command or " next dev" in command)
+        and ("vite" in command or "server.mjs" in command)
     )
 
 
 def _stop_unhealthy_source_frontend(frontend: ExistingFrontendRuntime) -> bool:
-    """Stop a locked Next dev server only when the lock points at Next itself."""
+    """Stop a stale frontend process only when it belongs to the Vue server."""
 
     if frontend.pid is None:
         return False
@@ -1233,7 +1157,7 @@ def _stop_unhealthy_source_frontend(frontend: ExistingFrontendRuntime) -> bool:
         except OSError:
             pass
         return True
-    if not _looks_like_next_process(frontend.pid):
+    if not _looks_like_frontend_process(frontend.pid):
         return False
 
     pgid = _get_pgid(frontend.pid)
@@ -1639,12 +1563,12 @@ def start(
     common_env["HOSTNAME"] = "0.0.0.0"
     common_env["NEXT_PUBLIC_API_BASE"] = api_base
     common_env["NEXT_PUBLIC_AUTH_ENABLED"] = "true" if auth_enabled else "false"
-    # The Next.js middleware (web/proxy.ts) runs in the frontend's Node runtime
-    # and reads these at request time to forward /api/* and /ws/* to the backend
-    # and to gate the login redirect. The browser uses relative paths, so the
+    # The Vue static server reads these at request time to forward /api/* and
+    # /ws/* to the backend. The browser uses relative paths, so the
     # frontend server reaches the backend on the IPv4 loopback at the resolved port —
     # use backend_url (not api_base, which may be an external browser URL).
     common_env["DEEPTUTOR_API_BASE_URL"] = backend_url
+    common_env["DEEPTUTOR_API_ORIGIN"] = backend_url
     common_env["DEEPTUTOR_AUTH_ENABLED"] = "true" if auth_enabled else "false"
     common_env["PYTHONUNBUFFERED"] = "1"
     common_env["PYTHONIOENCODING"] = "utf-8:replace"
@@ -1657,14 +1581,6 @@ def start(
     common_env.pop(DETACHED_WORKER_ENV, None)
     common_env.pop(DETACHED_TOKEN_ENV, None)
     _apply_single_user_allocator_env(common_env)
-    # ``DEEPTUTOR_NEXT_DIST_DIR`` is a build-only override.  In particular it
-    # must not leak into the backend: commands launched by agent tools inherit
-    # the backend environment, and an ordinary ``npm run build`` would then
-    # clean the live ``.next-deeptutor`` tree out from under the standalone
-    # server.  The generated server.js already embeds its distDir in
-    # ``__NEXT_PRIVATE_STANDALONE_CONFIG``, so neither long-running child needs
-    # this variable after the build has completed.
-    common_env.pop("DEEPTUTOR_NEXT_DIST_DIR", None)
     # Name the variables the children should read as "the launcher rendered this
     # out of the settings files", so the backend does not mistake our own export
     # for a deployment override and answer forever with the value it started with
@@ -1701,7 +1617,7 @@ def start(
         # the attachment limits therefore takes a restart to fully apply.
         "--ws-max-size",
         str(get_ws_max_size()),
-        # Outlast the frontend proxy's idle socket pool. web/proxy.ts forwards
+        # Outlast the frontend proxy's idle socket pool. server.mjs forwards
         # over Node's http.globalAgent, which reaps idle sockets on its own 5s
         # timer — the same value as uvicorn's default, so both ends raced to
         # close the same socket and a FIN landing on a reuse surfaced as

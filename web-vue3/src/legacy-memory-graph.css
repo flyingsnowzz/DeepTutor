@@ -1,0 +1,64 @@
+.memory-graph-page{position:relative;display:flex;width:100%;height:100%;max-width:none;margin:0;flex-direction:column;overflow:hidden;background:var(--background)}
+.memory-graph-header{display:flex;align-items:center;justify-content:space-between;min-height:60px;padding:8px 24px;border-bottom:1px solid var(--background)}
+.memory-graph-heading{display:flex;align-items:center;gap:12px}
+.memory-graph-heading>a{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;color:var(--muted-foreground);font-size:12px;text-decoration:none}
+.memory-graph-heading>a:hover{background:var(--muted);color:var(--foreground)}
+.memory-graph-heading h1{margin:0;font-family:var(--font-serif);font-size:16px;font-weight:600;letter-spacing:-.01em}
+.memory-graph-heading p{margin:2px 0 0;color:var(--muted-foreground);font-size:11.5px}
+.memory-graph-header>button{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--background);color:var(--muted-foreground);font-size:12px}
+.memory-graph-header>button:hover{background:var(--muted);color:var(--foreground)}
+.memory-graph-stage{position:relative;flex:1;min-height:0;overflow:hidden}
+.memory-graph-canvas{position:absolute;inset:0;width:100%;height:100%;min-height:0;border:0;border-radius:0;background:var(--background);touch-action:none}
+.memory-ring{fill:none;stroke:color-mix(in srgb,var(--primary) 10%,transparent);stroke-dasharray:5 8}
+.memory-edge{stroke:color-mix(in srgb,var(--primary) 35%,transparent);stroke-width:1.2}
+.memory-cluster-label{fill:color-mix(in srgb,var(--primary) 55%,var(--muted-foreground));font-size:16px;font-weight:500;text-anchor:middle;pointer-events:none}
+.memory-node{stroke:var(--background);stroke-width:1.5}
+.memory-node.chosen{stroke:var(--primary);stroke-width:2.5}
+.memory-graph-loading{position:absolute;z-index:3;top:18px;left:24px;margin:0;color:var(--muted-foreground);font-size:12px}
+.memory-graph-controls{position:absolute;z-index:4;top:16px;right:16px;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.memory-graph-zoom{display:inline-flex;align-items:center;overflow:hidden;border:1px solid var(--border);border-radius:8px;background:color-mix(in srgb,var(--card) 95%,transparent);box-shadow:var(--dt-shadow-xs)}
+.memory-graph-zoom>button{display:grid;place-items:center;width:32px;height:32px;border:0;background:transparent;color:var(--muted-foreground);font-size:15px}
+.memory-graph-zoom>button:hover{background:var(--muted);color:var(--foreground)}
+.memory-graph-zoom>span{padding:0 7px;color:var(--muted-foreground);font-size:11px;font-variant-numeric:tabular-nums}
+.memory-graph-layer-controls{display:flex;flex-direction:column;gap:2px;padding:6px;border:1px solid var(--border);border-radius:8px;background:color-mix(in srgb,var(--card) 95%,transparent);box-shadow:var(--dt-shadow-xs)}
+.memory-graph-layer-controls>button{display:flex;align-items:center;gap:7px;min-width:142px;height:24px;padding:0 5px;border:0;border-radius:5px;background:transparent;color:var(--foreground);font-size:11.5px;text-align:left}
+.memory-graph-layer-controls>button:hover{background:var(--muted)}
+.memory-graph-layer-controls>button>i,.memory-graph-legend i{width:8px;height:8px;border-radius:50%}
+.memory-graph-layer-controls>button>strong{font-weight:500}
+.memory-graph-layer-controls>button>span{color:var(--muted-foreground)}
+.memory-graph-layer-controls>button>b{margin-left:auto;color:var(--muted-foreground);font-size:11px;font-weight:400}
+.memory-graph-hovercard{position:absolute;z-index:6;width:min(320px,80%);padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--card);box-shadow:var(--dt-shadow-md);pointer-events:auto}
+.memory-graph-hovercard>small{display:block;margin-bottom:5px;color:var(--muted-foreground);font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}
+.memory-graph-hovercard>p{display:-webkit-box;margin:0;overflow:hidden;color:var(--foreground);font-size:12px;line-height:1.65;-webkit-box-orient:vertical;-webkit-line-clamp:6}
+.memory-graph-hovercard>button{margin-top:8px;padding:0;border:0;background:transparent;color:var(--muted-foreground);font-size:10.5px}
+.memory-graph-legend{position:absolute;z-index:4;bottom:16px;left:16px;max-width:448px;padding:12px;border:1px solid var(--border);border-radius:8px;background:color-mix(in srgb,var(--card) 92%,transparent);box-shadow:var(--dt-shadow-xs);pointer-events:none}
+.memory-graph-legend>div{display:flex;align-items:center;gap:12px;margin-bottom:8px;color:var(--muted-foreground);font-size:11.5px}
+.memory-graph-legend>div>span{display:inline-flex;align-items:center;gap:5px}
+.memory-graph-legend>div>span>strong{color:var(--foreground);font-weight:500}
+.memory-graph-legend>p{margin:0;color:var(--muted-foreground);font-size:11.5px;line-height:1.65}
+@media(max-width:767px){.memory-graph-header{padding:8px 14px}.memory-graph-heading>p{display:none}.memory-graph-controls{top:10px;right:10px}.memory-graph-legend{right:12px;bottom:12px;left:12px;max-width:none}.memory-graph-hovercard{left:12px!important;width:calc(100% - 24px)}}
+
+.memory-l3-center{fill:color-mix(in srgb,var(--primary) 12%,var(--background));stroke:color-mix(in srgb,var(--primary) 22%,transparent)}.memory-l3-title{fill:var(--primary);font-size:22px;font-weight:700;letter-spacing:.08em;text-anchor:middle}.memory-l3-subtitle{fill:var(--muted-foreground);font-size:14px;font-weight:500;letter-spacing:.04em;text-anchor:middle}
+
+.memory-cluster-count{fill:var(--muted-foreground);font-weight:500;text-anchor:middle;pointer-events:none}
+.memory-crumb>span>svg{display:block;flex:none}
+
+.memory-cluster-label{fill:var(--foreground);font-weight:600}
+
+.memory-graph-header a svg,.memory-graph-header button svg{display:block;flex:none}
+.memory-spin{animation:dt-spin 900ms linear infinite}
+@keyframes dt-spin{to{transform:rotate(360deg)}}
+
+.memory-graph-canvas{background:radial-gradient(ellipse at center,color-mix(in srgb,var(--primary) 7%,var(--background)) 0%,var(--background) 65%)}
+.memory-graph-layer-controls>button>svg{margin-left:auto;color:var(--muted-foreground)}
+
+.memory-graph-header{min-height:0;padding:12px 40px}
+.memory-graph-heading>a{padding:4px 10px;gap:6px}
+.memory-graph-heading p{margin-top:0}
+.memory-graph-header>button{padding:4px 10px;gap:6px}
+.memory-graph-zoom>span{padding:0 8px}
+.memory-graph-layer-controls{gap:4px}
+.memory-graph-layer-controls>button{height:auto;min-width:0;min-height:0;padding:4px 8px}
+.memory-ring{stroke-width:.6;stroke-dasharray:2 3}
+
+.memory-graph-layer-controls>button{min-width:121.375px}

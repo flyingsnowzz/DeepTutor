@@ -28,7 +28,7 @@
 </p>
 
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/downloads/)
-[![Next.js 16](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=next.js&logoColor=white)](https://nextjs.org/)
+[![Vue 3](https://img.shields.io/badge/Vue-3-42b883?style=flat-square&logo=vuedotjs&logoColor=white)](https://vuejs.org/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue?style=flat-square)](LICENSE)
 [![GitHub release](https://img.shields.io/github/v/release/HKUDS/DeepTutor?style=flat-square&color=brightgreen)](https://github.com/HKUDS/DeepTutor/releases)
 [![arXiv](https://img.shields.io/badge/arXiv-2604.26962-b31b1b?style=flat-square&logo=arxiv&logoColor=white)](https://arxiv.org/abs/2604.26962)
@@ -326,7 +326,7 @@ shown as **best effort** in Workspace settings.
 <details>
 <summary><b>Option 1 — Install From PyPI</b> · full local Web app + CLI, no clone required</summary>
 
-**1.7.0 modular installation:** use `deeptutor[full]` for the Web app and CLI, or `deeptutor` for core chat. Feature modules must match the core version; 1.6.15 and earlier use the previous package layout. To develop against current `dev`, use the source instructions below or build [local wheels](docs-for-dev/MODULES.md). Needs **Python 3.11–3.14** and a **Node.js 20+** runtime on PATH (the packaged Next.js standalone server is spawned by `deeptutor start`).
+**1.7.0 modular installation:** use `deeptutor[full]` for the Web app and CLI, or `deeptutor` for core chat. Feature modules must match the core version; 1.6.15 and earlier use the previous package layout. To develop against current `dev`, use the source instructions below or build [local wheels](docs-for-dev/MODULES.md). Needs **Python 3.11–3.14** and a **Node.js 22+** runtime on PATH (the packaged Vue static server is spawned by `deeptutor start`).
 
 ```bash
 mkdir -p my-deeptutor && cd my-deeptutor
@@ -362,13 +362,13 @@ python -m pip install --upgrade pip
 # Install backend + frontend deps
 python -m pip install -r requirements/full.txt
 python -m pip install -e . --no-deps
-( cd web && npm ci --legacy-peer-deps )
+( cd web-vue3 && npm ci )
 
 deeptutor init
 deeptutor start --dev
 ```
 
-`deeptutor start` builds the local `web/` frontend for production once and reuses it; `--dev` runs Next.js with HMR. Config layout, ports, and `Ctrl+C` match Option 1.
+`deeptutor start` builds the local `web-vue3/` frontend for production once and reuses it; `--dev` runs Vite with HMR. Config layout, ports, and `Ctrl+C` match Option 1.
 
 <details>
 <summary><b>Conda environment</b> (instead of <code>venv</code>)</summary>
@@ -403,14 +403,9 @@ python scripts/install_extras.py edge-tts        # Optional free speech provider
 <details>
 <summary><b>Frontend dependency tweaks & dev-server troubleshooting</b></summary>
 
-**Changing frontend dependencies:** run `npm install --legacy-peer-deps` to refresh `web/package-lock.json`, then commit both `web/package.json` and `web/package-lock.json`.
+**Changing frontend dependencies:** run `npm install` in `web-vue3/` to refresh `web-vue3/package-lock.json`, then commit both `web-vue3/package.json` and `web-vue3/package-lock.json`.
 
-**Stuck dev server:** if `deeptutor start --dev` reports an existing frontend that isn't responding, stop the PID it prints. If no Next.js process is actually running, the lock files are stale — remove them and retry:
-
-```bash
-rm -f web/.next/dev/lock web/.next/lock
-deeptutor start --dev
-```
+**Stuck dev server:** stop the existing launcher with `deeptutor stop`, then retry `deeptutor start --dev`. If a standalone Vite process still owns the port, stop that PID before restarting; the Vue launcher does not use Next.js lock files.
 
 </details>
 
@@ -452,7 +447,7 @@ running `python scripts/docker_compose.py up -d`. When omitted it uses
 `./data/user/workspace`. Docker paths are selected at startup and therefore
 appear locked in the Web settings page.
 
-> **Only `3782` needs to be published.** The browser talks exclusively to the frontend origin; the Next.js middleware (`web/proxy.ts`) forwards `/api/*` and `/ws/*` to the FastAPI backend **inside the container**. Publishing `8001` (`-p 127.0.0.1:8001:8001`) is optional — handy only for hitting the API directly with curl or scripts.
+> **Only `3782` needs to be published.** The browser talks exclusively to the frontend origin; the Vue static server (`web-vue3/server.mjs`) forwards `/api/*`, `/files/*`, and `/ws/*` to the FastAPI backend **inside the container**. Publishing `8001` (`-p 127.0.0.1:8001:8001`) is optional — handy only for hitting the API directly with curl or scripts.
 
 Open [http://127.0.0.1:3782](http://127.0.0.1:3782). The container creates `/app/data/user/settings/*.json` on first boot; configure model providers from the Web Settings page. Config, API keys, logs, the default Content Workspace, memory, and knowledge bases persist in the `deeptutor-data` volume. A separately mounted Content Workspace persists at its host path instead. Optional extras belong on the deployment, not in a shell: set `DEEPTUTOR_EXTRAS` (and `DEEPTUTOR_APT_PACKAGES` for system libraries) and every container started from it re-applies them, where a `docker exec … pip install` would be lost at the next `compose down`.
 
@@ -460,7 +455,7 @@ Open [http://127.0.0.1:3782](http://127.0.0.1:3782). The container creates `/app
 - **Detached:** add `-d`, then `docker logs -f deeptutor` to follow, `docker stop deeptutor` to stop, `docker rm deeptutor` before reusing the name. The `deeptutor-data` volume keeps private runtime data and the default Content Workspace across restarts; a separately mounted Content Workspace persists at its host path.
 
 **Remote Docker / reverse proxy:** the browser only talks to the frontend
-origin (`:3782`); the in-container Next.js middleware forwards `/api/*` and
+origin (`:3782`); the in-container Vue static server forwards `/api/*`, `/files/*`, and
 `/ws/*` to the backend server-side. For the common single-container case you
 don't configure an API base at all — just point your reverse proxy / TLS
 terminator at `:3782`. You only need an API base for a **split deployment**
@@ -551,7 +546,7 @@ deeptutor config show
 
 </details>
 
-This source install includes server dependencies but skips frontend setup. Keep the checkout around — the editable install points to it. To add the Web UI later, install Node.js 22 LTS, run `npm ci --legacy-peer-deps` in `web/`, then run `deeptutor init` and `deeptutor start` from the project root.
+This source install includes server dependencies but skips frontend setup. Keep the checkout around — the editable install points to it. To add the Web UI later, install Node.js 22 LTS, run `npm ci` in `web-vue3/`, then run `deeptutor init` and `deeptutor start` from the project root.
 
 </details>
 
@@ -918,7 +913,7 @@ Successful version history survives same-account token renewal and catalog authe
 
 Default local Docker and Podman deployments use separate loopback networks and need a temporary bridge during sign-in. Follow the [temporary local Codex OAuth bridge guide](./docs-for-dev/CONTAINERIZATION.md#temporary-local-codex-oauth-bridge) for the exact Docker, Compose, Podman, and teardown commands.
 
-For a remote deployment, the browser's `localhost` and the server's `localhost` are different machines, so an ordinary reverse proxy alone cannot carry the browser's localhost callback to the server. Use an SSH tunnel as the callback bridge. The tunnel reaches the already-published Web port; Next.js rewrites only the exact callback path to the public callback broker, and the broker validates `state` before routing to the original OAuth operation. The callback listener remains on the backend loopback, ports `1455` and `1457` are not published, and this path supports the default Docker bridge network.
+For a remote deployment, the browser's `localhost` and the server's `localhost` are different machines, so an ordinary reverse proxy alone cannot carry the browser's localhost callback to the server. Use an SSH tunnel as the callback bridge. The tunnel reaches the already-published Web port; the Vue server rewrites only the exact callback path to the public callback broker, and the broker validates `state` before routing to the original OAuth operation. The callback listener remains on the backend loopback, ports `1455` and `1457` are not published, and this path supports the default Docker bridge network.
 
 ```bash
 ssh -N -L 1455:127.0.0.1:3782 <ssh-user>@<server-host>
@@ -952,13 +947,13 @@ data/
 └── system/                  # auth · grants · audit · user-secrets/<owner> (OAuth tokens)
 ```
 
-Users may register at `/register` and sign in at `/login`. Public registration always creates an ordinary account. The deployment super administrator is specified by `username` and a bcrypt `password_hash` in `data/user/settings/auth.json` and signs in at `/admin/login`. That account can create other administrators at `/admin/accounts`; their credentials are stored separately in `data/system/auth/admins.json`. Administrators own model catalogs, provider credentials, shared knowledge bases, skills, canonical shared books, and per-user grants. Admin-created local users choose Standard, Learner, or Custom. Learner locks learning capabilities and material policy, adds an adaptive profile, and supports revocable device credentials with expiry and daily limits; authorized guardians can view reports, approve materials, and reset credentials. Other users get isolated workspaces plus scoped models, KBs, skills, partners, and shared-book access without receiving raw API keys.
+Users may register at `/register` and sign in at `/login`. Public registration always creates an ordinary account. The deployment super administrator is specified by `username` and a bcrypt `password_hash` in `data/user/settings/auth.json` and signs in at `/admin/login`. That account can create other administrators at `/admin/accounts`; their credentials are stored separately in `data/system/auth/admins.json`. Administrators own shared model catalogs, provider credentials, shared knowledge bases, skills, canonical shared books, and per-user grants. Ordinary users can also create private model catalogs and credentials in their own account scope; these personal profiles never enter the shared catalog. Admin-created local users choose Standard, Learner, or Custom. Learner locks learning capabilities and material policy, adds an adaptive profile, and supports revocable device credentials with expiry and daily limits; authorized guardians can view reports, approve materials, and reset credentials. Other users get isolated workspaces plus personal and administrator-assigned models, KBs, skills, partners, and shared-book access without receiving shared raw API keys.
 
 Existing administrator records in the legacy user store remain able to sign in through `/admin/login` during upgrades. They are not automatically made super administrators; configure the deployment account in `auth.json` to manage the separate administrator store.
 
 **Enable it:** generate a bcrypt hash with `python -c "from deeptutor.services.auth import hash_password; print(hash_password('your-password'))"`, then set `enabled=true`, a distinct super administrator `username`, and `password_hash` in `data/user/settings/auth.json`. Restart `deeptutor start` and sign in at `/admin/login`. Public users can register independently; administrators can assign models, KBs, skills, partners, tool/MCP/CLI-app policy, and code-execution access through grants. Configure shared books under each user's **Book access** panel.
 
-For split private/public origins, set `auth.private_login_hosts` (or `AUTH_PRIVATE_LOGIN_HOSTS`) to the private frontend hosts permitted to submit administrator credentials. Ordinary user registration and login remain public. The frontend forwards the incoming HTTP `Host` to the backend as its frontend-host assertion. Preserve the browser's `Host` through your reverse proxy, and make the public ingress reject requests naming a private host; do not expose a raw Next.js port that accepts arbitrary `Host` values. HTTP `Host` can be forged by a direct client, so private-host authorization depends on that ingress boundary. The backend accepts frontend-host assertions only from loopback by default. If the Web frontend connects from another container or host, set `AUTH_TRUSTED_FRONTEND_PROXY_IPS` to that frontend proxy's exact IP address on the backend process (comma-separated for more than one). This replaces the defaults; include `127.0.0.1,::1` if local frontend connections are also needed. Keep the backend API private to the frontend proxy and do not include general client networks in this list. When `private_login_hosts` is non-empty, an authenticated user on a private origin can open **Profile → Public device sign-in** and create a short-lived, host-bound pairing link for an HTTPS public origin. The public `/handoff` page exchanges the one-time code for an equally short JWE ticket in a POST body, consumes the ticket once, and receives the normal HttpOnly session cookie.
+For split private/public origins, set `auth.private_login_hosts` (or `AUTH_PRIVATE_LOGIN_HOSTS`) to the private frontend hosts permitted to submit administrator credentials. Ordinary user registration and login remain public. The frontend forwards the incoming HTTP `Host` to the backend as its frontend-host assertion. Preserve the browser's `Host` through your reverse proxy, and make the public ingress reject requests naming a private host; do not expose a raw frontend port that accepts arbitrary `Host` values. HTTP `Host` can be forged by a direct client, so private-host authorization depends on that ingress boundary. The backend accepts frontend-host assertions only from loopback by default. If the Web frontend connects from another container or host, set `AUTH_TRUSTED_FRONTEND_PROXY_IPS` to that frontend proxy's exact IP address on the backend process (comma-separated for more than one). This replaces the defaults; include `127.0.0.1,::1` if local frontend connections are also needed. Keep the backend API private to the frontend proxy and do not include general client networks in this list. When `private_login_hosts` is non-empty, an authenticated user on a private origin can open **Profile → Public device sign-in** and create a short-lived, host-bound pairing link for an HTTPS public origin. The public `/handoff` page exchanges the one-time code for an equally short JWE ticket in a POST body, consumes the ticket once, and receives the normal HttpOnly session cookie.
 
 > PocketBase stays a single-user integration — keep `integrations.pocketbase_url` blank for multi-user deployments unless you've wired up an external user store.
 

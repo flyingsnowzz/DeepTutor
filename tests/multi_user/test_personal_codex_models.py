@@ -219,3 +219,136 @@ def test_reading_options_does_not_create_a_catalog_file(as_user, monkeypatch, no
         catalog_path = personal_models.owner_catalog_service().path
         assert model_access.redacted_model_access()["llm"] == []
         assert not catalog_path.exists()
+
+
+def _write_connected_catalog(path: Path, *, connection_id: str, profile_id: str, model_id: str) -> None:
+    """Catalog shaped like the Settings UI output: a top-level provider
+    connection referenced by the profile/model through provider_ref."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "connections": [
+                    {
+                        "id": connection_id,
+                        "name": "deepseek",
+                        "provider": "deepseek",
+                        "binding": "deepseek",
+                        "base_url": "https://api.deepseek.com",
+                        "api_key": "personal-secret",
+                        "api_version": "",
+                        "extra_headers": {},
+                    }
+                ],
+                "services": {
+                    "llm": {
+                        "profiles": [
+                            {
+                                "id": profile_id,
+                                "name": "deepseek",
+                                "binding": "deepseek",
+                                "provider_ref": {
+                                    "connection_id": connection_id,
+                                    "binding": "deepseek",
+                                    "default_base_url": "https://api.deepseek.com",
+                                },
+                                "api_key": "",
+                                "base_url": "",
+                                "models": [
+                                    {
+                                        "id": model_id,
+                                        "name": "deepseek-flash",
+                                        "model": "deepseek-flash",
+                                        "provider_ref": {
+                                            "connection_id": connection_id,
+                                            "binding": "deepseek",
+                                            "default_base_url": "https://api.deepseek.com",
+                                        },
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_personal_provider_connection_is_merged_with_profile(as_user, no_grants):
+    """A profile created in the Settings UI references a connection stored in
+    the owner's own catalog. Merging only the services would leave the
+    provider_ref dangling and every turn failed with
+    'This provider is no longer configured'."""
+    from deeptutor.services.config.provider_links import resolve_profile_provider
+
+    connection_id = "conn-personal-deepseek"
+    profile_id = "llm-profile-personal-deepseek"
+    model_id = "llm-model-personal-deepseek"
+    with as_user("u_alice"):
+        _write_connected_catalog(
+            personal_models.owner_catalog_service().path,
+            connection_id=connection_id,
+            profile_id=profile_id,
+            model_id=model_id,
+        )
+
+    shared_catalog = {
+        "connections": [
+            {"id": "conn-shared-only", "name": "team", "binding": "custom", "api_key": "team"}
+        ],
+        "services": {"llm": {"profiles": []}},
+    }
+    with as_user("u_alice"):
+        merged = personal_models.merge_personal_llm_profiles(shared_catalog)
+
+    merged_connection_ids = {c["id"] for c in merged["connections"]}
+    assert connection_id in merged_connection_ids
+    assert "conn-shared-only" in merged_connection_ids
+
+    profile = merged["services"]["llm"]["profiles"][0]
+    resolved = resolve_profile_provider(merged, "llm", profile, profile["models"][0])
+    assert resolved["binding"] == "deepseek"
+    assert resolved["base_url"] == "https://api.deepseek.com"
+    assert resolved["api_key"] == "personal-secret"
+
+
+def test_personal_connection_resolves_end_to_end(as_user, no_grants):
+    """The exact runtime path a chat turn takes must resolve a personal
+    connection-backed selection instead of raising the provider error."""
+    from deeptutor.services.config import provider_runtime
+    from deeptutor.services.model_selection import LLMSelection
+
+    connection_id = "conn-personal-deepseek"
+    profile_id = "llm-profile-personal-deepseek"
+    model_id = "llm-model-personal-deepseek"
+    with as_user("u_alice"):
+        personal_path = personal_models.owner_catalog_service().path
+        _write_connected_catalog(
+            personal_path,
+            connection_id=connection_id,
+            profile_id=profile_id,
+            model_id=model_id,
+        )
+        # A catalog service rooted at the isolated admin tree (no deepseek
+        # connection there) mirrors the production shared-vs-owner split.
+        from deeptutor.services.config.model_catalog import ModelCatalogService
+        from deeptutor.multi_user.paths import get_admin_path_service
+
+        shared_service = ModelCatalogService(
+            get_admin_path_service().get_settings_file("model_catalog")
+        )
+
+        merged = personal_models.merge_personal_llm_profiles(shared_service.load())
+        cfg = provider_runtime.resolve_llm_runtime_config(
+            catalog=merged,
+            service=shared_service,
+            llm_selection=LLMSelection.from_payload(
+                {"profile_id": profile_id, "model_id": model_id}
+            ),
+        )
+        assert cfg.model == "deepseek-flash"
+        assert cfg.base_url == "https://api.deepseek.com"
+        assert cfg.api_key == "personal-secret"

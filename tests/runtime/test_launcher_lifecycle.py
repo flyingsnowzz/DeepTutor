@@ -255,14 +255,9 @@ def test_kill_port_listeners_tolerates_signal_errors(monkeypatch, fast_clock) ->
 
 
 def _make_packaged(packaged: Path) -> None:
-    (packaged / ".next" / "sub").mkdir(parents=True, exist_ok=True)
-    (packaged / "server.js").write_text(
-        "start(__NEXT_PUBLIC_API_BASE_PLACEHOLDER__)", encoding="utf-8"
-    )
-    (packaged / ".next" / "sub" / "chunk.js").write_text(
-        "auth=__NEXT_PUBLIC_AUTH_ENABLED_PLACEHOLDER__;", encoding="utf-8"
-    )
-
+    (packaged / "dist").mkdir(parents=True, exist_ok=True)
+    (packaged / "server.mjs").write_text("server", encoding="utf-8")
+    (packaged / "dist" / "index.html").write_text("vue", encoding="utf-8")
 
 def test_packaged_web_cache_rebuilds_when_marker_is_corrupt(tmp_path: Path) -> None:
     packaged = tmp_path / "pkg"
@@ -271,7 +266,7 @@ def test_packaged_web_cache_rebuilds_when_marker_is_corrupt(tmp_path: Path) -> N
     home = tmp_path / "home"
     cache = home / launcher.WEB_CACHE_DIR
     cache.mkdir(parents=True)
-    (cache / "server.js").write_text("stale build", encoding="utf-8")
+    (cache / "server.mjs").write_text("stale build", encoding="utf-8")
     (cache / "orphan.txt").write_text("stale orphan", encoding="utf-8")
     marker = cache / ".deeptutor-web-runtime.json"
     marker.write_text("{not valid json", encoding="utf-8")
@@ -284,22 +279,17 @@ def test_packaged_web_cache_rebuilds_when_marker_is_corrupt(tmp_path: Path) -> N
     )
 
     assert result == cache
-    server_js = (cache / "server.js").read_text(encoding="utf-8")
-    assert "http://127.0.0.1:8001" in server_js
-    assert "__NEXT_PUBLIC_API_BASE_PLACEHOLDER__" not in server_js
-    chunk = (cache / ".next" / "sub" / "chunk.js").read_text(encoding="utf-8")
-    assert "auth=true;" in chunk
+    assert (cache / "server.mjs").read_text(encoding="utf-8") == "server"
+    assert (cache / "dist" / "index.html").read_text(encoding="utf-8") == "vue"
     assert not (cache / "orphan.txt").exists()  # cache was rebuilt, not patched in place
     payload = json.loads(marker.read_text(encoding="utf-8"))
-    assert payload["api_base"] == "http://127.0.0.1:8001"
-    assert payload["auth_enabled"] is True
     assert payload["source"] == str(packaged)
 
 
 def test_packaged_web_cache_hit_with_valid_marker_skips_rebuild(tmp_path: Path) -> None:
     packaged = tmp_path / "pkg"
     packaged.mkdir()
-    (packaged / "server.js").write_text("server", encoding="utf-8")
+    (packaged / "server.mjs").write_text("server", encoding="utf-8")
     home = tmp_path / "home"
     kwargs: dict[str, Any] = {
         "home": home,
@@ -321,47 +311,35 @@ def test_packaged_web_cache_hit_with_valid_marker_skips_rebuild(tmp_path: Path) 
 
 
 def test_source_production_build_rebuilds_when_marker_is_corrupt(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    source = tmp_path / "web"
-    source.mkdir()
-    (source / "package.json").write_text('{"scripts":{"build":"next build"}}', encoding="utf-8")
-    next_env = source / "next-env.d.ts"
-    next_env.write_text("// developer dist types\n", encoding="utf-8")
-    (source / "app").mkdir()
-    (source / "app" / "page.tsx").write_text(
-        "export default function Page() { return null; }", encoding="utf-8"
-    )
-
+    source = tmp_path / "web-vue3"
+    (source / "src").mkdir(parents=True)
+    (source / "node_modules").mkdir()
+    (source / "package.json").write_text('{"scripts":{"build":"vite build"}}', encoding="utf-8")
+    (source / "src" / "page.ts").write_text("export default null", encoding="utf-8")
     dist = source / launcher.SOURCE_PRODUCTION_DIST_DIR
-    (dist / "standalone").mkdir(parents=True)
-    (dist / "BUILD_ID").write_text("build-1", encoding="utf-8")
-    (dist / "standalone" / "server.js").write_text("", encoding="utf-8")
+    dist.mkdir()
+    (dist / "index.html").write_text("stale", encoding="utf-8")
     marker = dist / launcher.SOURCE_BUILD_MARKER
     marker.write_text("][ corrupted", encoding="utf-8")
-
     builds: list[list[str]] = []
 
     def _run(command, cwd, env, **_kwargs):
         builds.append(list(command))
-        next_env.write_text("// production dist types\n", encoding="utf-8")
+        (dist / "index.html").write_text("fresh", encoding="utf-8")
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(launcher.subprocess, "run", _run)
-    kwargs: dict[str, Any] = {
-        "api_base": "http://127.0.0.1:8001",
-        "auth_enabled": False,
-    }
+    kwargs: dict[str, Any] = {"api_base": "http://127.0.0.1:8001", "auth_enabled": False}
 
     launcher._ensure_source_production_build(source, "npm", **kwargs)
     assert builds == [["npm", "run", "build"]]
-    assert next_env.read_text(encoding="utf-8") == "// developer dist types\n"
     payload = json.loads(marker.read_text(encoding="utf-8"))
     assert set(payload) == {"fingerprint"}
 
     launcher._ensure_source_production_build(source, "npm", **kwargs)
-    assert builds == [["npm", "run", "build"]]  # fresh marker reuses the build
+    assert builds == [["npm", "run", "build"]]
 
 
 # --------------------------------------------------------------------------

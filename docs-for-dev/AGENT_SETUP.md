@@ -41,8 +41,8 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements/full.txt
 python -m pip install -e . --no-deps
-cd web
-npm ci --legacy-peer-deps
+cd web-vue3
+npm ci
 cd ..
 ```
 

@@ -24,7 +24,7 @@
 # ============================================
 # IMPORTANT: Frontend-to-Backend API URL
 # ============================================
-# The frontend (Next.js) runs entirely in the user's browser — not in the container.
+# The Vue 3 frontend runs entirely in the user's browser — not in the container.
 # This means "localhost" in the browser refers to the USER'S MACHINE, not the Docker host.
 #
 # LOCAL deployment (Docker on the same machine you browse from):

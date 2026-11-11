@@ -1,0 +1,24 @@
+<script setup lang="ts">
+import { computed, onMounted, reactive, ref } from 'vue'
+import { api, post } from '../api'
+import LegacyIcon from './LegacyIcon.vue'
+import WorkspaceRow from './WorkspaceRow.vue'
+import WorkspaceResourcePicker from './WorkspaceResourcePicker.vue'
+interface Row { workspace_id: string; kind: 'system' | 'general' | 'workspace'; follows_root: boolean; display_name: string; path: string; archived: boolean; status: 'ready' | 'invalid'; error: string; instructions?: string; resources?: { skills: string[] | null; mcp: string[] | null; knowledge_bases: string[] | null } }
+interface Catalog { root: string; workspaces: Row[] }
+const catalog = ref<Catalog | null>(null)
+const root = ref('')
+const creating = ref(false)
+const busy = ref(false)
+const error = ref('')
+const notice = ref('')
+const draft = reactive({ display_name: '', path: '', instructions: '', resources: { skills: null, mcp: null, knowledge_bases: null } })
+const custom = computed(() => catalog.value?.workspaces.filter(row => row.kind === 'workspace') ?? [])
+const builtIn = computed(() => catalog.value?.workspaces.filter(row => row.kind !== 'workspace') ?? [])
+async function load() { error.value = ''; try { const next = await api<Catalog>('/api/settings/workspace/registrations'); catalog.value = next; root.value = next.root || '' } catch (cause) { error.value = cause instanceof Error ? cause.message : '工作区加载失败' } }
+onMounted(load)
+async function run(action: () => Promise<unknown>) { busy.value = true; error.value = ''; notice.value = ''; try { await action(); await load(); notice.value = '工作区已更新'; return true } catch (cause) { error.value = cause instanceof Error ? cause.message : '操作失败'; return false } finally { busy.value = false } }
+async function create() { if (!draft.display_name.trim()) return; if (await run(() => post('/api/settings/workspace/registrations', { name: draft.display_name.trim(), ...(draft.path.trim() ? { path: draft.path.trim() } : {}), ...(draft.instructions.trim() ? { instructions: draft.instructions.trim() } : {}), resources: draft.resources }))) { Object.assign(draft, { display_name: '', path: '', instructions: '', resources: { skills: null, mcp: null, knowledge_bases: null } }); creating.value = false } }
+async function migrateRoot() { if (root.value.trim() && root.value.trim() !== catalog.value?.root) await run(() => post('/api/settings/workspace/registrations/migrate-root', { path: root.value.trim() })) }
+</script>
+<template><div><header class="legacy-settings-page-header"><h1>工作区</h1><p>将对话、学习资料和进度按工作区整理。</p></header><div class="workspace-page-heading"><div><h2>工作区</h2><p>系统、通用与自建工作区，根目录与存储迁移。</p></div><button class="primary" :disabled="busy || !catalog" @click="creating = !creating"><LegacyIcon name="plus" :size="14" />新建工作区</button></div><p v-if="error" class="error" role="alert">{{ error }} <button @click="load">重试</button></p><p v-if="notice || busy" class="notice" role="status">{{ busy ? '正在处理，迁移会复制并验证文件，请稍候…' : notice }}</p><p v-if="!catalog && !error" class="legacy-settings-loading">加载中…</p><fieldset v-else :disabled="busy"><form v-if="creating" class="workspace-create-form" @submit.prevent="create"><label>工作区名称<input v-model="draft.display_name" required maxlength="100" placeholder="例如：概率论"></label><label>现有目录（可选）<input v-model="draft.path" placeholder="留空则在根目录下创建"></label><p class="muted">将文件放入目录供智能体读取，生成文件写入 outputs/。</p><label>工作区说明<textarea v-model="draft.instructions" rows="3" placeholder="此工作区的目标、约定和输出要求。" /></label><WorkspaceResourcePicker v-model="draft.resources" /><div><button class="primary" :disabled="!draft.display_name.trim()">创建工作区</button><button type="button" @click="creating = false">取消</button></div></form><section class="legacy-setting-section"><header><h2>自建工作区</h2><p>书籍、精通路径、阅读、观看和对话按工作区隔离。</p></header><div class="legacy-setting-section-body"><WorkspaceRow v-for="row in custom" :key="row.workspace_id" :row="row" :busy="busy" @saved="load" /><div v-if="!custom.length && !creating" class="workspace-empty"><LegacyIcon name="folder" :size="28" /><p>为主题或项目创建工作区，让相关对话共享其中的文件。</p></div></div></section><section class="legacy-setting-section"><h2>内置工作区</h2><div class="legacy-setting-section-body"><WorkspaceRow v-for="row in builtIn" :key="row.workspace_id" :row="row" :busy="busy" @saved="load" /></div></section><section class="legacy-setting-section"><header><h2>存储位置</h2><p>工作区默认位于“根目录 / 工作区 ID”。更改根目录会迁移跟随根目录的文件夹，自定义位置不变；远程部署使用服务器目录。</p></header><div class="legacy-setting-section-body"><form class="workspace-root-form" @submit.prevent="migrateRoot"><label>工作区根目录<input v-model="root" required @keydown.enter.prevent="migrateRoot"></label><div v-if="root.trim() !== catalog?.root"><button class="primary" :disabled="!root.trim()">迁移到新根目录</button><p class="muted">旧目录会保留为备份，请先完成正在进行的对话。</p></div></form></div></section></fieldset></div></template>

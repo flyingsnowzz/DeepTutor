@@ -77,7 +77,7 @@ where = ["."]
 include = ["deeptutor*", "deeptutor_cli*", "deeptutor_web*"]
 namespaces = true
 [tool.setuptools.package-data]
-"deeptutor_web" = ["**/*", ".next/**/*"]
+"deeptutor_web" = ["**/*", "dist/**/*"]
 "*" = ["*.json", "*.yaml", "*.yml", "*.md", "*.sh", "*.j2", "*.jinja", "*.ts", "*.tsx", "*.mjs", "*.js", "*.css", "*.html", "*.svg", "*.png", "*.woff2"]
 """
             if name == "core":
@@ -90,7 +90,7 @@ namespaces = true
                 for key, value in entries.items():
                     config += f"{json.dumps(key)} = {json.dumps(value)}\n"
             (stage / "MANIFEST.in").write_text(
-                "recursive-include deeptutor_web *\nrecursive-include deeptutor_web/.next *\n"
+                "recursive-include deeptutor_web *\nrecursive-include deeptutor_web/dist *\n"
             )
             (stage / "pyproject.toml").write_text(config)
             result = subprocess.run(

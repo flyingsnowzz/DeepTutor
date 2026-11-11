@@ -18,7 +18,7 @@ not have these boundaries. Local wheel builds are also supported.
 ```sh
 python -m pip install -r requirements/full.txt
 python -m pip install -e . --no-deps
-(cd web && npm ci --legacy-peer-deps)
+(cd web-vue3 && npm ci)
 deeptutor module list
 deeptutor module disable solve
 deeptutor module enable solve
@@ -57,7 +57,7 @@ are installed per environment; enabled state lives in
 
 Install `server` for the API, then `web` for packaged Web assets. The Web wheel
 requires assets produced by `scripts/prepare_web_package.py` for `deeptutor start`;
-a source development server uses the checkout's `web/` directory. Build and
+a source development server uses the checkout's `web-vue3/` directory. Build and
 release automation prepares Web assets before building the wheel family.
 
 ## Upgrade from 1.6.15
@@ -96,7 +96,7 @@ own distribution. The builder rejects overlapping wheel files.
 | Module family | Contents |
 | --- | --- |
 | core | Durable turns, chat, ask-questions, shared tools, CLI/SDK, settings and sessions |
-| server / web | API and authentication adapters / packaged Next.js assets |
+| server / web | API and authentication adapters / packaged Vue 3 assets |
 | solve / questions / research | Planning loop / question generation / research pipeline |
 | visualize / renderer-manim | HTML/SVG/chart visualizers / optional Manim pipeline |
 | video-lesson / audio-overview | Browser lessons / audio overview generation |

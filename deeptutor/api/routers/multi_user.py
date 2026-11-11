@@ -329,6 +329,19 @@ def _require_assignable_user(user_id: str) -> tuple[str, dict[str, Any]]:
 
 
 def _users_by_id() -> dict[str, dict[str, Any]]:
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        import psycopg
+        from deeptutor.services.postgres.database import authentication_database_url
+
+        url = authentication_database_url().replace("postgresql+asyncpg://", "postgresql://", 1)
+        with psycopg.connect(url) as db:
+            rows = db.execute(
+                """SELECT u.id,u.username FROM users u JOIN first_party_credentials c
+                   ON c.owner_user_id=u.id WHERE u.is_active=true"""
+            ).fetchall()
+        return {str(row[0]): {"id": row[0], "username": row[1]} for row in rows}
     return {str(user.get("id") or ""): user for user in list_user_info()}
 
 
@@ -526,7 +539,13 @@ async def guardian_report(
         public_permission_dict,
     )
 
-    permission = normalize_book_permission(learner_record.get("book_permission"))
+    from deeptutor.services.storage_backend import storage_backend
+    if storage_backend() == "postgres":
+        from deeptutor.multi_user.postgres_book_permission import load as load_book_permission
+
+        permission = load_book_permission(learner_user_id)
+    else:
+        permission = normalize_book_permission(learner_record.get("book_permission"))
     permission_dict = public_permission_dict(permission)
     assigned_materials = [
         {**book, "permission": permission.level_for(book["book_id"])}
@@ -850,6 +869,11 @@ async def get_user_book_permission(
     )
 
     _, record = _require_assignable_user(user_id)
+    from deeptutor.services.storage_backend import storage_backend
+    if storage_backend() == "postgres":
+        from deeptutor.multi_user.postgres_book_permission import load
+
+        return {"permission": public_permission_dict(load(user_id))}
     return {
         "permission": public_permission_dict(
             normalize_book_permission(record.get("book_permission"))
@@ -875,7 +899,15 @@ async def put_user_book_permission(
         default=payload.default,
         books=tuple(payload.books.items()),
     )
-    if not set_book_permission(username, permission):
+    from deeptutor.services.storage_backend import storage_backend
+    if storage_backend() == "postgres":
+        from deeptutor.multi_user.postgres_book_permission import save
+
+        try:
+            save(user_id, permission)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+    elif not set_book_permission(username, permission):
         raise HTTPException(status_code=404, detail="User not found")
     result = public_permission_dict(permission)
     log_admin_action(

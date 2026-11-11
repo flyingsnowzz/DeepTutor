@@ -106,6 +106,12 @@ def canonical_book_permission(raw: Any) -> dict[str, Any]:
 def permission_for_user(user: CurrentUser) -> BookPermission:
     if user.is_admin:
         return ADMIN_BOOK_PERMISSION
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        from .postgres_book_permission import load
+
+        return load(user.id)
     from .identity import get_user
 
     record = get_user(user.username) or {}

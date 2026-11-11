@@ -205,7 +205,7 @@ def test_owner_and_home_scope_are_preserved(client, copilot_http, tmp_path, monk
 
 
 @pytest.mark.parametrize("user_id", ["u_reader", f"{PARTNER_USER_PREFIX}ada"])
-def test_settings_permission_gate_still_applies(client, copilot_http, tmp_path, user_id):
+def test_personal_model_discovery_uses_only_the_callers_credentials(client, copilot_http, tmp_path, user_id):
     user = CurrentUser(
         id=user_id,
         username=user_id,
@@ -214,7 +214,9 @@ def test_settings_permission_gate_still_applies(client, copilot_http, tmp_path, 
     )
     with user_context(user):
         response = client.post(ENDPOINT, json={"binding": "github_copilot"})
-    assert response.status_code == 403
+    # Personal discovery is allowed, but it never falls back to administrator
+    # credentials or another owner's stored login.
+    assert response.status_code == 502
     assert copilot_http.calls == []
 
 

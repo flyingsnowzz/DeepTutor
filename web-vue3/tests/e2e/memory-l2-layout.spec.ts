@@ -1,0 +1,21 @@
+import { expect, test } from '@playwright/test'
+
+test('L2 workspace keeps the legacy three-column layout and visible run action', async ({ page }) => {
+  await page.route('**/api/auth/status*', route => route.fulfill({ json: { enabled: false, authenticated: false, is_admin: false } }))
+  await page.route(/\/api\/memory\/overview(?:\?.*)?$/, route => route.fulfill({ json: { docs: [{ layer: 'L2', key: 'chat', exists: false, updated_at: null, entry_count: 0, backlog: 0 }] } }))
+  await page.route(/\/api\/memory\/doc\/L2\/chat(?:\?.*)?$/, route => route.fulfill({ json: { content: '' } }))
+  await page.route(/\/api\/memory\/doc\/L2\/chat\/lines(?:\?.*)?$/, route => route.fulfill({ json: { lines: [] } }))
+  await page.route(/\/api\/memory\/snapshot\/[^/?]+(?:\?.*)?$/, route => route.fulfill({ json: { entities: [], pending_changes: [] } }))
+  await page.route(/\/api\/settings\/llm-options(?:\?.*)?$/, route => route.fulfill({ json: { active: null, options: [] } }))
+  await page.route(/\/api\/memory\/settings(?:\?.*)?$/, route => route.fulfill({ json: { update: { l2_budget: 20, l3_budget: 12 }, audit: { l2_budget: 10, l3_budget: 8 }, dedup: { iterations: 3 } } }))
+  await page.goto('/memory/l2')
+  await expect(page.locator('.memory-workbench.with-run-panel')).toBeVisible()
+  await expect(page.locator('.memory-breadcrumb')).toContainText('L2 · 各模块摘要')
+  await expect(page.locator('.memory-breadcrumb')).toContainText('聊天')
+  await expect(page.locator('.memory-breadcrumb')).not.toContainText('/ chat')
+  await expect(page.locator('.memory-rail')).not.toContainText('0 条')
+  await expect(page.locator('.memory-document-content')).toContainText('空。点击 更新 从原始 trace 中抽取事实。')
+  await expect(page.locator('.memory-run-panel')).toBeVisible()
+  await expect(page.locator('.memory-run-start')).toHaveCSS('background-color', 'rgb(37, 99, 235)')
+  await expect(page.locator('.memory-document-content')).toContainText('空。点击 更新 从原始 trace 中抽取事实。')
+})

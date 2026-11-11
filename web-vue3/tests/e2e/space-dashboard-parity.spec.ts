@@ -1,0 +1,20 @@
+import { expect, test } from '@playwright/test'
+
+test('space dashboard uses the legacy page bar and live resource cards', async ({ page }) => {
+  await page.route('**/api/auth/status*', route => route.fulfill({ json: { enabled: false, authenticated: false, is_admin: false } }))
+  await page.route(/\/api\/capabilities\/registered(?:\?.*)?$/, route => route.fulfill({ json: { capabilities: [] } }))
+  await page.route(/\/api\/sessions(?:\?.*)?$/, route => route.fulfill({ json: { sessions: [{ id: 's1' }, { id: 's2' }] } }))
+  await page.route(/\/api\/notebooks(?:\?.*)?$/, route => route.fulfill({ json: { notebooks: [{ id: 'n1' }] } }))
+  await page.route(/\/api\/question-notebook\/entries(?:\?.*)?$/, route => route.fulfill({ json: { total: 42, items: [] } }))
+  await page.route(/\/api\/knowledge-bases\/list(?:\?.*)?$/, route => route.fulfill({ json: [{ name: 'kb' }] }))
+  await page.goto('/space')
+  await expect(page.locator('.space-page-bar')).toBeVisible()
+  await expect(page.locator('.space-page-content > .feature-heading')).toHaveCSS('position', 'absolute')
+  await expect(page.locator('.dashboard-card')).toHaveCount(5)
+  await expect(page.locator('.dashboard-card').nth(0)).toContainText(/2\s*段对话/)
+  await expect(page.locator('.dashboard-card').nth(1)).toContainText(/1\s*个收藏夹/)
+  await expect(page.locator('.dashboard-card').nth(3)).toContainText(/42\s*道题/)
+  await expect(page.locator('.dashboard-card').nth(4)).toContainText(/1\s*个知识库/)
+  await page.locator('.space-crumb').click()
+  await expect(page.getByRole('menu', { name: '资料' }).getByRole('menuitem')).toHaveCount(6)
+})

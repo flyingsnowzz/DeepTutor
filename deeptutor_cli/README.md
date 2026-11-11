@@ -26,7 +26,7 @@ python scripts/install_extras.py math-animator  # 数学动画（另需系统 La
 python scripts/install_extras.py all            # 全部依赖（含开发工具）
 ```
 
-源码 CLI 用户可跳过前端；需要 Web UI 时，安装 Node.js 22 LTS，在 `web/`
+源码 CLI 用户可跳过前端；需要 Web UI 时，安装 Node.js 22 LTS，在 `web-vue3/`
 执行 `npm ci --legacy-peer-deps`，回到项目根目录执行 `deeptutor init` 和
 `deeptutor start`。使用 Python 3.11–3.14；复用已有 checkout 时先检查分支和本地改动。
 
@@ -286,7 +286,7 @@ deeptutor provider login codebuddy         # 校验 CodeBuddy SDK 登录；未�
 
 登录命令使用实时发现的可用模型验证推理访问；`init` 验证用户选中的模型，失败时中止而非显示验证成功或保存配置。GitHub 登录成功不等于 Copilot 模型可用，失败后登录凭据仍保留。运行时遵循 token 交换返回的 API 地址（包括刷新后的变化），并根据模型的 `supported_endpoints` 选择 Responses 或 Chat Completions；只支持其他协议的模型不在列表中。
 
-远程部署时，浏览器的 `localhost` 和服务器的 `localhost` 不是同一台机器，仅有普通反向代理无法把浏览器的 localhost callback 送到服务器，必须用 SSH 隧道建立 callback 桥。隧道通向已发布的 Web 端口；Next.js 只把精确的 callback 路径改写到 public callback broker，broker 校验 `state` 后才路由到原 OAuth operation。callback listener 仍位于后端 loopback，不发布 `1455`/`1457`，并支持默认 Docker bridge 网络。
+远程部署时，浏览器的 `localhost` 和服务器的 `localhost` 不是同一台机器，仅有普通反向代理无法把浏览器的 localhost callback 送到服务器，必须用 SSH 隧道建立 callback 桥。隧道通向已发布的 Web 端口；Vue 静态服务器只把精确的 callback 路径改写到 public callback broker，broker 校验 `state` 后才路由到原 OAuth operation。callback listener 仍位于后端 loopback，不发布 `1455`/`1457`，并支持默认 Docker bridge 网络。
 
 ```bash
 ssh -N -L 1455:127.0.0.1:3782 <ssh-user>@<server-host>

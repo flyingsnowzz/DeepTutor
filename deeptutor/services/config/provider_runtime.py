@@ -723,10 +723,17 @@ def _is_local_base_url(base_url: str | None) -> bool:
 def _load_catalog(catalog: dict[str, Any] | None) -> dict[str, Any]:
     if catalog is not None:
         return catalog
-    return get_model_catalog_service().load()
+    try:
+        from deeptutor.multi_user.personal_models import merge_personal_catalog
+
+        return merge_personal_catalog(get_model_catalog_service().load())
+    except Exception:
+        return get_model_catalog_service().load()
 
 
-def _with_personal_llm_profiles(catalog: dict[str, Any]) -> dict[str, Any]:
+def _with_personal_llm_profiles(
+    catalog: dict[str, Any], *, include_active: bool = True,
+) -> dict[str, Any]:
     """Add the current owner's own owner-bound LLM profiles to *catalog*.
 
     An ordinary user's Codex profile lives in their own catalog rather than
@@ -739,7 +746,7 @@ def _with_personal_llm_profiles(catalog: dict[str, Any]) -> dict[str, Any]:
     try:
         from deeptutor.multi_user.personal_models import merge_personal_llm_profiles
 
-        return merge_personal_llm_profiles(catalog)
+        return merge_personal_llm_profiles(catalog, include_active=include_active)
     except Exception:
         return catalog
 
@@ -875,7 +882,11 @@ def resolve_llm_runtime_config(
     credentials configured for chat.
     """
     catalog_service = service or get_model_catalog_service()
-    loaded = _with_personal_llm_profiles(_load_catalog(catalog))
+    loaded = (
+        _with_personal_llm_profiles(_load_catalog(None))
+        if catalog is None
+        else _load_catalog(catalog)
+    )
     # Parse the payload once: ``apply_llm_selection_to_catalog`` would otherwise
     # re-parse it, so a malformed selection would be validated (and rejected)
     # from two places. ``from_payload`` is idempotent on an already-parsed value.

@@ -1,0 +1,21 @@
+import { expect, test } from '@playwright/test'
+
+test('learning journal uses the legacy page bar and empty mission cards', async ({ page }) => {
+  await page.route('**/api/auth/status*', route => route.fulfill({ json: { enabled: false, authenticated: false, is_admin: false } }))
+  await page.route('**/api/learning-journal*', route => route.fulfill({ json: { mission: { topic: '', why: '', level: '', updated_at: '' }, last_session: { summary: '', next_focus: '', updated_at: '' }, records: [] } }))
+  await page.goto('/space/journal')
+  await expect(page.locator('.journal-page-bar')).toBeVisible()
+  await expect(page.locator('.journal-page-content > .feature-heading')).toHaveCSS('position', 'absolute')
+  await expect(page.getByRole('heading', { name: '当前学习目标', exact: true })).toBeVisible()
+  await expect(page.getByText('导师尚未记录你的学习目标。在对话中请导师设置一个目标。')).toBeVisible()
+  await expect(page.getByText('暂无会话交接。', { exact: true })).toBeVisible()
+  await expect(page.getByText('暂无已确认的学习记录。', { exact: true })).toBeVisible()
+  const cards = page.locator('.journal-page-content section[aria-label]')
+  await expect(cards).toHaveCount(3)
+  await expect(cards.nth(0)).toHaveCSS('height', '102px')
+  const first = await cards.nth(0).boundingBox()
+  const second = await cards.nth(1).boundingBox()
+  expect(second!.y - (first!.y + first!.height)).toBeCloseTo(20, 1)
+  await page.locator('.journal-crumb').click()
+  await expect(page.getByRole('menu', { name: '资料' }).getByRole('menuitem')).toHaveCount(6)
+})

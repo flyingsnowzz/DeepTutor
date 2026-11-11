@@ -1,0 +1,25 @@
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import { api, post } from '../api'
+import LegacyIcon from './LegacyIcon.vue'
+interface KB { id?: string; name: string; path?: string; is_default?: boolean; status?: string; source?: string; read_only?: boolean; statistics?: Record<string, unknown>; metadata?: Record<string, unknown> }
+interface Workspace { workspace_id: string; kind: string; display_name: string; archived: boolean; status: string }
+interface MovePreview { source_id: string; target_id: string; files: number; bytes: number; assignments: { workspace_id: string; display_name: string }[]; blockers: string[] }
+const props = defineProps<{ kb: KB; busy?: boolean }>()
+const emit = defineEmits<{ setDefault: []; delete: []; moved: [targetId: string] }>()
+const workspaces = ref<Workspace[]>([])
+const targetWorkspaceId = ref('')
+const movePreview = ref<MovePreview | null>(null)
+const moveBusy = ref(false)
+const moveError = ref('')
+const sourceId = computed(() => props.kb.id || props.kb.name)
+const sourceWorkspaceId = computed(() => sourceId.value.startsWith('account:kb:') ? '' : sourceId.value.startsWith('workspace:') ? sourceId.value.slice('workspace:'.length).split(':kb:')[0] : null)
+const canMove = computed(() => !props.kb.read_only && sourceWorkspaceId.value !== null)
+const targets = computed(() => workspaces.value.filter(row => row.kind === 'workspace' && !row.archived && row.status === 'ready' && row.workspace_id !== sourceWorkspaceId.value))
+function value(key: string) { return props.kb.metadata?.[key] ?? props.kb.statistics?.[key] ?? '—' }
+function formatBytes(bytes: number) { if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`; if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`; return `${bytes} B` }
+onMounted(async () => { try { const result = await api<{ workspaces: Workspace[] }>('/api/settings/workspace/registrations'); workspaces.value = result.workspaces || [] } catch { workspaces.value = [] } })
+async function reviewMove() { moveBusy.value = true; moveError.value = ''; try { movePreview.value = await post<MovePreview>('/api/settings/workspace/knowledge-bases/preview-move', { source_id: sourceId.value, target_workspace_id: targetWorkspaceId.value }) } catch (cause) { moveError.value = cause instanceof Error ? cause.message : '检查移动失败' } finally { moveBusy.value = false } }
+async function commitMove() { moveBusy.value = true; moveError.value = ''; try { const result = await post<MovePreview>('/api/settings/workspace/knowledge-bases/move', { source_id: sourceId.value, target_workspace_id: targetWorkspaceId.value }); emit('moved', result.target_id) } catch (cause) { moveError.value = cause instanceof Error ? cause.message : '移动失败' } finally { moveBusy.value = false } }
+</script>
+<template><section class="kb-section"><header class="kb-section-heading"><div><h2>概览</h2><p>只读元数据。使用下方操作管理这个知识库。</p></div></header><dl class="kb-settings-grid"><div><dt>检索引擎</dt><dd>{{ value('rag_provider') }}</dd></div><div><dt>嵌入模型</dt><dd>{{ value('embedding_model') }}</dd></div><div><dt>嵌入维度</dt><dd>{{ value('embedding_dim') }}</dd></div><div><dt>原始文档</dt><dd>{{ value('raw_documents') }}</dd></div><div><dt>创建时间</dt><dd>{{ value('created_at') }}</dd></div><div><dt>最近更新</dt><dd>{{ value('last_updated') }}</dd></div><div><dt>最近索引</dt><dd>{{ value('last_indexed_at') }}</dd></div><div v-if="kb.path" class="wide"><dt>磁盘路径</dt><dd><code>{{ kb.path }}</code></dd></div></dl><section class="kb-default-action"><div><h3>默认知识库</h3><p>对话未明确选择知识库时，优先使用默认库。</p></div><button v-if="!kb.is_default && !kb.read_only" :disabled="busy" @click="emit('setDefault')">☆ 设为默认</button><span v-else>★ 当前默认库</span></section><section v-if="canMove" class="kb-move-action"><div><h3>移动知识库</h3><p>移动文档、设置和索引，并更新现有工作区分配。</p></div><select v-model="targetWorkspaceId" aria-label="目标工作区" :disabled="moveBusy" @change="movePreview = null"><option value="" disabled>账户资源库</option><option v-for="workspace in targets" :key="workspace.workspace_id" :value="workspace.workspace_id">{{ workspace.display_name }}</option></select><button :disabled="moveBusy || targetWorkspaceId === sourceWorkspaceId" @click="reviewMove">{{ moveBusy ? '检查中…' : '检查移动详情' }}</button><div v-if="movePreview" class="kb-move-preview"><p>{{ movePreview.files }} 个文件 · {{ formatBytes(movePreview.bytes) }}</p><p v-if="movePreview.assignments.length">将更新以下工作区的分配：{{ movePreview.assignments.map(row => row.display_name).join('、') }}</p><p v-for="blocker in movePreview.blockers" :key="blocker" class="error" role="alert">{{ blocker }}</p><button v-if="!movePreview.blockers.length" class="primary" :disabled="moveBusy" @click="commitMove">→ 移动知识库</button></div><p v-if="moveError" class="error" role="alert">{{ moveError }}</p></section><section class="kb-danger-zone"><div><h3>危险操作</h3><p>删除会永久移除原始文档和索引版本，无法撤销。</p></div><button v-if="!kb.read_only" class="danger" :disabled="busy" @click="emit('delete')"><LegacyIcon name="close" :size="14" />删除知识库</button></section></section></template>

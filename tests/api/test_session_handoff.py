@@ -71,7 +71,7 @@ def test_private_create_public_exchange_and_complete(tmp_path, monkeypatch) -> N
         },
         json={"public_origin": "https://app.example"},
     )
-    assert created.status_code == 200
+    assert created.status_code == 200, created.text
     assert created.headers["cache-control"] == "no-store"
     body = created.json()
     assert body["handoff_url"] == f"https://app.example/handoff?code={body['code']}"
@@ -107,6 +107,98 @@ def test_private_create_public_exchange_and_complete(tmp_path, monkeypatch) -> N
         json={"ticket": ticket},
     )
     assert replayed.status_code == 400
+
+
+@pytest.mark.parametrize("role", ["user", "admin"])
+def test_postgres_account_handoff_reissues_current_account_cookie(
+    tmp_path, monkeypatch, role: str
+) -> None:
+    client, bearer = _handoff_client(tmp_path, monkeypatch)
+    store = session_handoff.SessionHandoffStore(tmp_path / "postgres-account-handoff.sqlite3")
+    monkeypatch.setattr(auth_router, "get_session_handoff_store", lambda: store)
+    monkeypatch.setattr(auth_router, "postgres_accounts_enabled", lambda: True)
+
+    class Accounts:
+        active = True
+
+        async def get_user(self, user_id: str):
+            return {"id": user_id, "username": "alice"} if self.active else None
+
+        async def get_admin(self, user_id: str):
+            return {"id": user_id, "username": "alice", "is_superadmin": True} if self.active else None
+
+    accounts = Accounts()
+
+    class Gateway:
+        users = accounts
+        admins = accounts
+
+        async def decode_token(self, token: str):
+            return auth_service.TokenPayload(
+                username="alice", role=role, user_id="u-alice"
+            ) if token == bearer else None
+
+        def issue_user_token(self, account: dict, **kwargs):
+            assert account["id"] == "u-alice"
+            return "postgres-user-cookie"
+
+        def issue_admin_token(self, account: dict):
+            assert account["id"] == "u-alice"
+            return "postgres-admin-cookie"
+
+    monkeypatch.setattr(auth_router, "get_postgres_web_account_gateway", Gateway)
+
+    created = client.post(
+        "/api/auth/session-handoff",
+        headers={
+            "x-deeptutor-frontend-host": "private.example:8443",
+            "Authorization": f"Bearer {bearer}",
+        },
+        json={"public_origin": "https://app.example"},
+    )
+    assert created.status_code == 200, created.text
+    exchanged = client.post(
+        "/api/auth/session-handoff/exchange",
+        headers={"x-deeptutor-frontend-host": "app.example"},
+        json={"code": created.json()["code"]},
+    )
+    assert exchanged.status_code == 200
+    ticket = exchanged.json()["ticket"]
+
+    completed = client.post(
+        "/api/auth/session-handoff/complete",
+        headers={"x-deeptutor-frontend-host": "app.example"},
+        json={"ticket": ticket},
+    )
+    assert completed.status_code == 200
+    assert completed.cookies.get("dt_token") == f"postgres-{role}-cookie"
+    assert "httponly" in completed.headers["set-cookie"].lower()
+    assert client.post(
+        "/api/auth/session-handoff/complete",
+        headers={"x-deeptutor-frontend-host": "app.example"},
+        json={"ticket": ticket},
+    ).status_code == 400
+
+    another = client.post(
+        "/api/auth/session-handoff",
+        headers={
+            "x-deeptutor-frontend-host": "private.example:8443",
+            "Authorization": f"Bearer {bearer}",
+        },
+        json={"public_origin": "https://app.example"},
+    )
+    assert another.status_code == 200
+    ticket = client.post(
+        "/api/auth/session-handoff/exchange",
+        headers={"x-deeptutor-frontend-host": "app.example"},
+        json={"code": another.json()["code"]},
+    ).json()["ticket"]
+    accounts.active = False
+    assert client.post(
+        "/api/auth/session-handoff/complete",
+        headers={"x-deeptutor-frontend-host": "app.example"},
+        json={"ticket": ticket},
+    ).status_code == 400
 
 
 def test_codes_and_tickets_reject_mismatched_frontend_hosts(tmp_path, monkeypatch) -> None:

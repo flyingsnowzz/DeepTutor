@@ -1,0 +1,21 @@
+import { expect, test } from '@playwright/test'
+
+test('calendar keeps Sunday-first weeks, workspace layers and reminder controls', async ({ page }) => {
+  await page.route('**/api/auth/status*', route => route.fulfill({ json: { enabled: false, authenticated: false, is_admin: false } }))
+  await page.route('**/api/calendar/calendars?*', route => route.fulfill({ json: { calendars: [{ id: 'default', name: '', color: '#2f6fde', visible: true, is_default: true }] } }))
+  await page.route('**/api/calendar/events?*', route => route.fulfill({ json: { occurrences: [] } }))
+  await page.route('**/api/calendar/layers?*', route => route.fulfill({ json: { reviews: [], automations: [], footprints: [] } }))
+  await page.route('**/api/task-board?*', route => route.fulfill({ json: { cards: [] } }))
+  await page.goto('/calendar')
+  await expect(page.locator('.calendar-weekday').first()).toHaveText('周日')
+  await expect(page.locator('.calendar-cell').first()).toHaveAttribute('data-day', '2026-11-01')
+  await expect(page.locator('.calendar-layer-toggle')).toHaveCount(4)
+  await expect(page.getByText('任务截止日期', { exact: true })).toBeVisible()
+  await expect(page.getByText('待复习内容', { exact: true })).toBeVisible()
+  await expect(page.getByText('自动化', { exact: true })).toBeVisible()
+  await expect(page.getByText('学习足迹', { exact: true })).toBeVisible()
+  await expect(page.locator('.calendar-reminder-settings button')).toBeVisible()
+  await expect(page.locator('.calendar-add')).toHaveCount(0)
+  await page.getByRole('button', { name: '＋ 新建日历' }).click()
+  await expect(page.locator('.calendar-add')).toBeVisible()
+})

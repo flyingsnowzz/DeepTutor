@@ -103,7 +103,7 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: web-vue3/package-lock.json
 
       - name: Install build tools
         run: |
@@ -145,14 +145,11 @@ jobs:
           PY
 
       - name: Install frontend dependencies
-        working-directory: web
-        run: npm ci --legacy-peer-deps
+        working-directory: web-vue3
+        run: npm ci
 
       - name: Build packaged Web assets
         run: python scripts/prepare_web_package.py
-        env:
-          NEXT_PUBLIC_API_BASE: __NEXT_PUBLIC_API_BASE_PLACEHOLDER__
-          NEXT_PUBLIC_AUTH_ENABLED: __NEXT_PUBLIC_AUTH_ENABLED_PLACEHOLDER__
 
       - name: Build distributions
         shell: bash

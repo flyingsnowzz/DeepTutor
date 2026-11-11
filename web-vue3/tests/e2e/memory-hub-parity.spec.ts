@@ -1,0 +1,36 @@
+import { expect, test } from '@playwright/test'
+
+test('memory hub uses the legacy page bar, layered cards and personalization menu', async ({ page }) => {
+  await page.route('**/api/auth/status*', route => route.fulfill({ json: { enabled: false, authenticated: false, is_admin: false } }))
+  await page.route(/\/api\/memory\/overview(?:\?.*)?$/, route => route.fulfill({ json: { docs: [
+    { layer: 'L2', key: 'chat', exists: true, updated_at: null, entry_count: 2, backlog: 0 },
+    { layer: 'L3', key: 'profile', exists: true, updated_at: null, entry_count: 1, backlog: 0 },
+  ], backups: ['v1-2026-11-10'] } }))
+  await page.route(/\/api\/memory\/snapshot\/[^?]+(?:\?.*)?$/, route => route.fulfill({ json: { entities: [{ id: 'e1' }], pending_changes: [] } }))
+  await page.goto('/memory')
+  await expect(page.locator('.memory-page-bar')).toBeVisible()
+  await expect(page.locator('.memory-hub-header')).toHaveCSS('position', 'absolute')
+  await expect(page.locator('.memory-page-icon')).toBeHidden()
+  await expect(page.locator('.memory-layer-card')).toHaveCount(3)
+  await expect(page.locator('.memory-layer-card').first()).toHaveCSS('padding', '24px')
+  await expect(page.locator('.memory-layer-card').first()).toHaveCSS('border-radius', '16px')
+  await expect(page.locator('.memory-card-hover')).toHaveCount(3)
+  const cards = page.locator('.memory-layer-card')
+  await expect(cards.nth(0)).toContainText('L1 · 工作区镜像')
+  await expect(cards.nth(0)).toContainText('条 workspace 实体')
+  await expect(cards.nth(1)).toContainText('L2 · 各模块摘要')
+  await expect(cards.nth(1)).toContainText('条事实，共 1 个 surface')
+  await expect(cards.nth(2)).toContainText('L3 · 跨模块知识')
+  await expect(cards.nth(2)).toContainText('条命题，共 1 个 slot')
+  await expect(page.locator('.memory-graph-callout')).toContainText('一次查看全部三层 —— 中心为 L3 综合，中圈为 L2 事实，外圈为 L1 原始事件。悬停任意节点可预览。')
+  await expect(page.locator('.memory-graph-callout')).toBeVisible()
+  const archived = page.locator('.memory-archived-banner')
+  await expect(archived).toBeVisible()
+  await archived.locator('.memory-archived-toggle').click()
+  await expect(archived).toContainText('memory/backup/v1-2026-11-10')
+  await archived.getByRole('button', { name: '关闭' }).click()
+  await expect(page.locator('.memory-archived-banner')).toHaveCount(0)
+  expect(await page.evaluate(() => localStorage.getItem('dt:memory:banner-dismissed'))).toBe('v1-2026-11-10')
+  await page.locator('.memory-crumb').click()
+  await expect(page.getByRole('menu', { name: '个性化' }).getByRole('menuitem')).toHaveCount(7)
+})

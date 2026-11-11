@@ -97,6 +97,15 @@ def authorize_guardian(
     learner_user_id: str,
     permissions: set[str] | frozenset[str] | list[str],
 ) -> dict[str, Any]:
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        from .postgres_guardians import authorize
+
+        allowed = sorted({item for item in permissions if item in GUARDIAN_PERMISSIONS})
+        if not allowed:
+            raise ValueError("At least one guardian permission is required.")
+        return authorize(guardian_user_id, learner_user_id, allowed)
     _require_ordinary_user(guardian_user_id, "guardian")
     _require_ordinary_user(learner_user_id, "learner")
     if guardian_user_id == learner_user_id:
@@ -142,6 +151,12 @@ def list_relationships(
     learner_user_id: str | None = None,
     include_revoked: bool = False,
 ) -> list[dict[str, Any]]:
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        from .postgres_guardians import list_records
+
+        return list_records(guardian_user_id=guardian_user_id, learner_user_id=learner_user_id, include_revoked=include_revoked)
     return [
         deepcopy(record)
         for record in _load_records()
@@ -152,6 +167,12 @@ def list_relationships(
 
 
 def relationship_by_id(relationship_id: str) -> dict[str, Any] | None:
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        from .postgres_guardians import by_id
+
+        return by_id(relationship_id)
     for record in _load_records():
         if record["id"] == relationship_id:
             return deepcopy(record)
@@ -164,6 +185,12 @@ def revoke_guardian(
     revoked_by: str,
     reason: str = "",
 ) -> dict[str, Any] | None:
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        from .postgres_guardians import revoke
+
+        return revoke(relationship_id, revoked_by=revoked_by, reason=reason)
     with _GUARDIANS_WRITE_LOCK:
         records = _load_records()
         for record in records:
@@ -205,6 +232,12 @@ def guardian_can_access(
     learner_user_id: str,
     permission: str,
 ) -> bool:
+    from deeptutor.services.storage_backend import storage_backend
+
+    if storage_backend() == "postgres":
+        from .postgres_guardians import can_access
+
+        return can_access(guardian_user_id, learner_user_id, permission)
     try:
         # Account presets may change after authorization. Re-check the current
         # identities so an old relationship never turns a former learner (or a

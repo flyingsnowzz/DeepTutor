@@ -786,7 +786,7 @@ class RuntimeSettingsService:
             "AUTH_COOKIE_SECURE": _bool_env(auth["cookie_secure"]),
             "AUTH_PRIVATE_LOGIN_HOSTS": ",".join(auth["private_login_hosts"]),
             "NEXT_PUBLIC_AUTH_ENABLED": _bool_env(auth["enabled"]),
-            # Consumed server-side by the Next.js middleware (web/proxy.ts) at
+            # Consumed server-side by the Vue static server (web-vue3/server.mjs) at
             # request time — NOT inlined into the browser bundle. The proxy
             # rewrites /api/* and /ws/* to DEEPTUTOR_API_BASE_URL and uses
             # DEEPTUTOR_AUTH_ENABLED to gate the login redirect. The launcher and
@@ -1579,8 +1579,8 @@ def get_ws_max_size() -> int:
 
 
 # Idle keep-alive window for backend HTTP connections — wire into every uvicorn
-# launch. The browser never reaches the backend directly: `web/proxy.ts` rewrites
-# `/api/*` and Next.js forwards over Node's `http.globalAgent`, which pools idle
+# launch. The browser never reaches the backend directly: `web-vue3/server.mjs` rewrites
+# `/api/*` and forwards over Node's HTTP agent, which pools idle
 # sockets and reaps them on its own 5s `timeout`. uvicorn's `timeout_keep_alive`
 # also defaults to 5s, so both ends armed an identical idle timer on the same
 # socket and raced to close it: when the server's FIN landed on a socket the pool

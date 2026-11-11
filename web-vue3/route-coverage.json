@@ -1,0 +1,327 @@
+[
+  {
+    "route": "/",
+    "source": "web/app/(workspace)/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/admin/accounts",
+    "source": "web/app/(admin)/admin/accounts/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/admin/login",
+    "source": "web/app/(auth)/admin/login/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/admin/users",
+    "source": "web/app/(admin)/admin/users/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/agents",
+    "source": "web/app/(utility)/agents/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/avatar-preview",
+    "source": "web/app/(utility)/avatar-preview/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/calendar",
+    "source": "web/app/(workspace)/calendar/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/chat",
+    "source": "web/app/(workspace)/chat/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/chat/:sessionId",
+    "source": "web/app/(workspace)/chat/[sessionId]/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/co-writer",
+    "source": "web/app/(workspace)/co-writer/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/co-writer/:docId",
+    "source": "web/app/(workspace)/co-writer/[docId]/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/handoff",
+    "source": "web/app/handoff/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/kanban",
+    "source": "web/app/(workspace)/kanban/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/knowledge-bases",
+    "source": "web/app/(utility)/knowledge-bases/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/knowledge-bases/:kbName",
+    "source": "web/app/(utility)/knowledge-bases/[kbName]/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/learning",
+    "source": "web/app/(workspace)/learning/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/learning/books",
+    "source": "web/app/(workspace)/learning/books/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/learning/books/:bookId",
+    "source": "web/app/(workspace)/learning/books/[bookId]/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/learning/books/:bookId/pages/:pageId",
+    "source": "web/app/(workspace)/learning/books/[bookId]/pages/[pageId]/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/learning/mastery",
+    "source": "web/app/(workspace)/learning/mastery/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/learning/mastery/:pathId",
+    "source": "web/app/(workspace)/learning/mastery/[pathId]/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/learning/mastery/:pathId/sessions",
+    "source": "web/app/(workspace)/learning/mastery/[pathId]/sessions/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/learning/mastery/:pathId/sessions/:sessionId",
+    "source": "web/app/(workspace)/learning/mastery/[pathId]/sessions/[sessionId]/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/learning/new",
+    "source": "web/app/(workspace)/learning/new/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/learning/practice",
+    "source": "web/app/(workspace)/learning/practice/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/learning/reading",
+    "source": "web/app/(workspace)/learning/reading/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/learning/reading/:workspaceId",
+    "source": "web/app/(workspace)/learning/reading/[workspaceId]/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/learning/reading/:workspaceId/sessions",
+    "source": "web/app/(workspace)/learning/reading/[workspaceId]/sessions/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/learning/reading/:workspaceId/sessions/:sessionId",
+    "source": "web/app/(workspace)/learning/reading/[workspaceId]/sessions/[sessionId]/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/learning/reading/folders/:folderId",
+    "source": "web/app/(workspace)/learning/reading/folders/[folderId]/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/learning/reading/materials",
+    "source": "web/app/(workspace)/learning/reading/materials/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/learning/watching",
+    "source": "web/app/(workspace)/learning/watching/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/learning/watching/:sessionId",
+    "source": "web/app/(workspace)/learning/watching/[sessionId]/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/login",
+    "source": "web/app/(auth)/login/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/memory",
+    "source": "web/app/(utility)/memory/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/memory/graph",
+    "source": "web/app/(utility)/memory/graph/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/memory/l1",
+    "source": "web/app/(utility)/memory/l1/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/memory/l2",
+    "source": "web/app/(utility)/memory/l2/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/memory/l2/:surface",
+    "source": "web/app/(utility)/memory/l2/[surface]/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/memory/l3",
+    "source": "web/app/(utility)/memory/l3/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/memory/l3/:slot",
+    "source": "web/app/(utility)/memory/l3/[slot]/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/memory/resolve",
+    "source": "web/app/(utility)/memory/resolve/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/notebooks",
+    "source": "web/app/(utility)/notebooks/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/notebooks/:notebookId",
+    "source": "web/app/(utility)/notebooks/[notebookId]/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/partners",
+    "source": "web/app/(workspace)/partners/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/partners/:partnerId",
+    "source": "web/app/(workspace)/partners/[partnerId]/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/partners/groups/:groupId",
+    "source": "web/app/(workspace)/partners/groups/[groupId]/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/partners/groups/new",
+    "source": "web/app/(workspace)/partners/groups/new/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/partners/new",
+    "source": "web/app/(workspace)/partners/new/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/personalization",
+    "source": "web/app/(utility)/personalization/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/profile",
+    "source": "web/app/(utility)/profile/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/register",
+    "source": "web/app/(auth)/register/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/session-handoff",
+    "source": "web/app/(utility)/session-handoff/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/settings",
+    "source": "web/app/(settings)/settings/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/settings/:section",
+    "source": "web/app/(settings)/settings/[section]/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/settings/progress",
+    "source": "web/app/(utility)/settings/progress/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/space",
+    "source": "web/app/(utility)/space/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/space/chat-history",
+    "source": "web/app/(utility)/space/chat-history/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/space/cli-apps",
+    "source": "web/app/(utility)/space/cli-apps/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/space/journal",
+    "source": "web/app/(utility)/space/journal/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/space/mcp",
+    "source": "web/app/(utility)/space/mcp/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/space/personas",
+    "source": "web/app/(utility)/space/personas/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/space/questions",
+    "source": "web/app/(utility)/space/questions/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/space/skills",
+    "source": "web/app/(utility)/space/skills/page.tsx",
+    "status": "complete"
+  },
+  {
+    "route": "/whisper",
+    "source": "web/app/(workspace)/whisper/page.tsx",
+    "status": "complete"
+  }
+]

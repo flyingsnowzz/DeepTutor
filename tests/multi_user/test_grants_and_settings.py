@@ -158,7 +158,7 @@ def test_non_admin_settings_catalog_is_forbidden(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_personal_settings_drafts_are_private_and_do_not_grant_catalog_access(
+async def test_personal_settings_drafts_and_catalogs_are_private(
     tmp_path, monkeypatch
 ):
     from types import SimpleNamespace
@@ -186,11 +186,10 @@ async def test_personal_settings_drafts_are_private_and_do_not_grant_catalog_acc
         assert (await settings_router.get_settings_draft())["draft"][
             "extensions"
         ] == payload.extensions
-        with pytest.raises(HTTPException) as exc:
-            await settings_router.update_settings_draft(
-                settings_router.SettingsDraftPayload(catalog={"version": 1})
-            )
-        assert exc.value.status_code == 403
+        personal = await settings_router.update_settings_draft(
+            settings_router.SettingsDraftPayload(catalog={"version": 1})
+        )
+        assert personal["draft"]["catalog"] == {"version": 1}
         await settings_router.discard_settings_draft()
         assert await settings_router.get_settings_draft() == {"draft": None}
     finally:

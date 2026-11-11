@@ -1,0 +1,33 @@
+import { expect, test } from '@playwright/test'
+
+test('personalization hub matches React group spacing and card geometry', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.route('**/api/auth/status*', route => route.fulfill({ json: { enabled: false, authenticated: false, is_admin: false } }))
+  await page.route(/\/api\/capabilities\/registered(?:\?.*)?$/, route => route.fulfill({ json: { capabilities: [] } }))
+  await page.route(/\/api\/subagents\/connections(?:\?.*)?$/, route => route.fulfill({ json: { connections: [] } }))
+  await page.route(/\/api\/personas(?:\?.*)?$/, route => route.fulfill({ json: { personas: [{ name: 'teacher' }] } }))
+  await page.route(/\/api\/skills\/list(?:\?.*)?$/, route => route.fulfill({ json: { skills: [{ name: 'docs' }] } }))
+  await page.route(/\/api\/space\/mcp\/servers(?:\?.*)?$/, route => route.fulfill({ json: { servers: {} } }))
+  await page.route(/\/api\/space\/cli-apps\/apps(?:\?.*)?$/, route => route.fulfill({ json: { apps: [] } }))
+
+  await page.goto('/personalization')
+  await expect(page.locator('.dashboard-card')).toHaveCount(6)
+  await expect(page.locator('.dashboard-card').first()).toContainText(/0\s*个智能体/)
+  const firstSection = page.locator('.space-page-content > section').first()
+  await expect(firstSection).toHaveCSS('margin-top', '0px')
+  const heading = firstSection.locator('h2')
+  await expect(heading).toHaveText('个性化')
+  const firstCard = page.locator('.dashboard-card').first()
+  const secondCard = page.locator('.dashboard-card').nth(1)
+  await expect(firstCard).toHaveCSS('height', '110.438px')
+  await expect(secondCard).toHaveCSS('height', '110.438px')
+  const cardBox = await firstCard.boundingBox()
+  const secondBox = await secondCard.boundingBox()
+  expect(cardBox?.y).toBeCloseTo(92.25, 1)
+  expect(secondBox?.x).toBe(862)
+  await expect(page.locator('.dashboard-card-count-text')).toHaveCount(0)
+  await expect(page.locator('.dashboard-card-arrow svg')).toHaveCount(6)
+
+  await firstCard.click()
+  await expect(page).toHaveURL(/\/agents$/)
+})
