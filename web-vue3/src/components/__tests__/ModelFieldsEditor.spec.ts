@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ModelFieldsEditor from '../ModelFieldsEditor.vue'
 import { api } from '../../api'
@@ -82,16 +82,16 @@ describe('ModelFieldsEditor', () => {
     expect(model.quality).toBe('hd')
   })
 
-  it('locks every control when the model is managed by a signed-in provider', async () => {
+  it('keeps reasoning effort editable while locking managed model ID, context, and capabilities', async () => {
     const model = makeModel({ managed_by: 'openai-codex' })
     const wrapper = mount(ModelFieldsEditor, { props: { service: 'llm', profile, model } })
     await vi.runAllTimersAsync()
     expect(wrapper.get('input[aria-label="上下文长度（tokens）"]').attributes('disabled')).toBeDefined()
-    expect(wrapper.get('select[aria-label="推理强度"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('select[aria-label="推理强度"]').attributes('disabled')).toBeUndefined()
     expect(wrapper.text()).toContain('托管')
-    // Attempted writes are ignored.
     await wrapper.get('select[aria-label="推理强度"]').setValue('high')
-    expect(model.reasoning_effort).toBeUndefined()
+    expect(model.reasoning_effort).toBe('high')
+    expect(wrapper.get('select[aria-label="工具调用（Tool calling）"]').attributes('disabled')).toBeDefined()
   })
   it('edits display name and model id, writing user_name when managed', async () => {
     const model = makeModel()
@@ -110,6 +110,36 @@ describe('ModelFieldsEditor', () => {
     expect(managedModel.name).toBe('Codex')
     // The provider model id stays locked for a managed connection.
     expect(managedWrapper.get('input[aria-label="模型 ID"]').attributes('disabled')).toBeDefined()
+  })
+
+  it('keeps an implicit display name in sync when the model ID changes', async () => {
+    const model = makeModel({ name: 'gpt-test' })
+    const wrapper = mount(ModelFieldsEditor, { props: { service: 'llm', profile, model } })
+    await wrapper.get('input[aria-label="模型 ID"]').setValue('gpt-next')
+    expect(model.model).toBe('gpt-next')
+    expect(model.name).toBe('gpt-next')
+    await wrapper.get('input[aria-label="模型显示名称"]').setValue('Custom title')
+    await wrapper.get('input[aria-label="模型 ID"]').setValue('gpt-latest')
+    expect(model.name).toBe('Custom title')
+  })
+
+  it('shows English model fields and ignores a stale capability response after switching away and back', async () => {
+    const pending: Array<(value: unknown) => void> = []
+    apiMock.mockImplementation(() => new Promise(resolve => pending.push(resolve)) as any)
+    const wrapper = mount(ModelFieldsEditor, { props: { service: 'llm', profile, model: makeModel(), language: 'en', binding: 'openai' } })
+    await vi.advanceTimersByTimeAsync(250)
+    await wrapper.setProps({ model: makeModel({ id: 'm2', model: 'other' }) })
+    await vi.advanceTimersByTimeAsync(250)
+    await wrapper.setProps({ model: makeModel() })
+    await vi.advanceTimersByTimeAsync(250)
+    pending[0]({ defaults: { tools: true } })
+    await flushPromises()
+    expect(wrapper.get('select[aria-label="Tool calling"]').text()).toContain('Auto')
+    expect(wrapper.get('select[aria-label="Tool calling"]').text()).not.toContain('Auto · Supported')
+    pending[2]({ defaults: { tools: false } })
+    await flushPromises()
+    expect(wrapper.get('select[aria-label="Tool calling"]').text()).toContain('Auto · Not supported')
+    expect(wrapper.text()).toContain('Context window (tokens)')
   })
 
 })

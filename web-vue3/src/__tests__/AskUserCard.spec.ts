@@ -41,6 +41,7 @@ describe('AskUserCard', () => {
 
   it('supports a custom answer and disables submit while streaming', async () => {
     const wrapper = mount(AskUserCard, { props: { data: cardData() } })
+    await wrapper.get('.ask-user-custom button').trigger('click')
     await wrapper.get('textarea').setValue('Medium')
     await wrapper.get('.ask-user-submit').trigger('click')
     expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({
@@ -57,8 +58,23 @@ describe('AskUserCard', () => {
         data: cardData({ resolved: true, answers: [{ questionId: 'pace', text: 'Slow' }] }),
       },
     })
-    expect(wrapper.text()).toContain('已补充信息')
+    expect(wrapper.text()).toContain('How fast?')
     expect(wrapper.text()).toContain('Slow')
     expect(wrapper.find('.ask-user-options').exists()).toBe(false)
+  })
+
+  it('submits an empty answer when skipping a selected option', async () => {
+    const wrapper = mount(AskUserCard, { props: { data: cardData() } })
+    await wrapper.findAll('.ask-user-options button')[0]!.trigger('click')
+    await wrapper.get('.ask-user-skip').trigger('click')
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual({ text: '', answers: [{ questionId: 'pace', text: '' }] })
+  })
+
+  it('reopens the card after a delivery failure', async () => {
+    const wrapper = mount(AskUserCard, { props: { data: cardData(), retryToken: 0 } })
+    await wrapper.get('.ask-user-submit').trigger('click')
+    expect(wrapper.get('.ask-user-submit').attributes('disabled')).toBeDefined()
+    await wrapper.setProps({ retryToken: 1 })
+    expect(wrapper.get('.ask-user-submit').attributes('disabled')).toBeUndefined()
   })
 })

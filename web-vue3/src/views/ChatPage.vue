@@ -112,7 +112,7 @@ import {
 
 type ChatAttachment = { id?: string; type: string; filename?: string; base64?: string; mime_type?: string; url?: string; size_bytes?: number; extracted_text?: string; text?: string; previewUrl?: string }
 type Message = { id?: number; role: string; content: string; attachments?: ChatAttachment[]; events?: TurnEvent[]; metadata?: Record<string, unknown>; parentMessageId?: number | null; parent_message_id?: number | null; capability?: string }
-type TurnEvent = { type: string; content?: string; session_id?: string; turn_id?: string; tool_call_id?: string; seq?: number; message?: string; status?: string; accepted?: boolean; metadata?: Record<string, unknown>; stage?: string; source?: string }
+type TurnEvent = { type: string; content?: string; session_id?: string; turn_id?: string; tool_call_id?: string; seq?: number; message?: string; status?: string; accepted?: boolean; command_type?: string; metadata?: Record<string, unknown>; stage?: string; source?: string }
 type Session = { id: string; title: string; messages?: Message[]; active_turn_id?: string; status?: string; content_workspace_id?: string; preferences?: Record<string, unknown> }
 type Capability = { id: string; available?: boolean; manifest?: { display_name?: string; title?: string; description?: string } | null }
 type LLMOption = { profile_id: string; model_id: string; profile_name: string; model_name: string; provider?: string; provider_label?: string; model?: string; context_window?: number; is_active_default?: boolean }
@@ -728,7 +728,15 @@ const languageChoices = computed(() => {
   const label = RESPONSE_LANGUAGE_OPTIONS.find(option => option.value === accountResponseLanguage.value)?.label || 'English'
   return [{ value: '', label: `账户默认 (${label})` }, ...RESPONSE_LANGUAGE_OPTIONS]
 })
-const languagePickerBelow = computed(() => messages.value.length === 0)
+const languagePickerBelow = ref(false)
+const trayRef = ref<HTMLElement | null>(null)
+function updateTrayPlacement() {
+  const el = trayRef.value
+  if (!el) { languagePickerBelow.value = messages.value.length === 0; return }
+  const rect = el.getBoundingClientRect()
+  const spaceBelow = window.innerHeight - rect.bottom
+  languagePickerBelow.value = spaceBelow > rect.top
+}
 const mentionItems = computed<ComposerMentionItem[]>(() => {
   const items: ComposerMentionItem[] = [
     { key: 'attach', label: '添加附件', description: '上传图片、Office 文档、代码或文本。', icon: 'attachment', count: pendingAttachments.value.length },
@@ -1332,6 +1340,7 @@ watch([busy, () => messages.value.length, selectedCapability], () => {
 const error = ref('')
 const notice = ref('')
 const waitingForReply = ref(false)
+const askUserRetryToken = ref(0)
 const reply = ref('')
 const connection = ref('idle')
 let socket: WebSocket | null = null
@@ -1352,7 +1361,9 @@ function clearTimers() {
   if (closeTimer) clearTimeout(closeTimer)
 }
 function send(value: Record<string, unknown>) {
-  if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ protocol_version: '2.0', ...value }))
+  if (socket?.readyState !== WebSocket.OPEN) return false
+  socket.send(JSON.stringify({ protocol_version: '2.0', ...value }))
+  return true
 }
 function connect(start?: { content: string; submissionId: string; attachments: ChatAttachment[]; editingMessageId?: number | null; masteryAction?: MasterySubmissionAction | null; parentMessageId?: number | null }, command?: Record<string, unknown>) {
   if (disposed || socket && socket.readyState <= WebSocket.OPEN) return
@@ -1376,6 +1387,7 @@ function connect(start?: { content: string; submissionId: string; attachments: C
     if (value.type === 'active_turn_info') {
       if (value.turn_id && ['running', 'queued', 'waiting_input', 'recovering'].includes(value.status || '')) {
         activeTurnId = value.turn_id; busy.value = true
+        if (value.status === 'waiting_input') waitingForReply.value = true
         lastActivityAt = Date.now()
         send({ type: 'resume_from', turn_id: activeTurnId, seq: lastSeq })
       } else if (busy.value) { busy.value = false; void refresh() }
@@ -1387,7 +1399,13 @@ function connect(start?: { content: string; submissionId: string; attachments: C
       return
     }
     if (value.type === 'command_ack') {
-      if (value.accepted === false) error.value = value.message || '操作未被接受'
+      if (value.accepted === false) {
+        error.value = value.message || '操作未被接受'
+        if (value.command_type === 'submit_user_reply') {
+          waitingForReply.value = true
+          askUserRetryToken.value += 1
+        }
+      }
       return
     }
     if (value.session_id) {
@@ -1402,6 +1420,7 @@ function connect(start?: { content: string; submissionId: string; attachments: C
     }
     if (!['content', 'session_meta', 'done', 'active_turn_info', 'command_ack'].includes(value.type)) streamEvents.value.push(value)
     if (value.type === 'content') streaming.value += value.content || ''
+    if (value.type === 'tool_result' && extractAskUserPayload([value])) waitingForReply.value = true
     if (value.type === 'wait_for_input') waitingForReply.value = true
     if (value.type === 'error') error.value = value.content || value.message || '对话失败'
     if (value.type === 'session_meta') void loadSessions().catch(() => null)
@@ -1497,6 +1516,7 @@ async function loadSession() {
   }
   if (!busy.value && session.active_turn_id && ['running', 'queued', 'waiting_input', 'recovering'].includes(session.status || '')) {
     activeSessionId = id; activeTurnId = session.active_turn_id; lastSeq = 0
+    waitingForReply.value = session.status === 'waiting_input'
     busy.value = true; connect()
   }
   } catch (cause) {
@@ -1555,6 +1575,8 @@ onMounted(() => {
   window.addEventListener('storage', syncTrayFold)
   window.addEventListener(TRAY_FOLD_EVENT, syncTrayFoldEvent)
   window.addEventListener('deeptutor:voice-autoplay-global', handleVoiceAutoplayPreference)
+  window.addEventListener('resize', updateTrayPlacement)
+  void nextTick(updateTrayPlacement)
   void loadVoicePreferences().then(result => { voiceAutoplay.value = result.autoplay })
   void api<PageCustomization>('/api/settings/page-customization').then(result => { if (result?.chat?.controls) customization.value = result }).catch(() => null)
   restoreFailedSubmission()
@@ -1572,7 +1594,7 @@ watch(() => props.initialPrompt, value => { if (value && !prompt.value) prompt.v
 watch(masteryPathId, () => { if (props.mastery) { masteryTopic.value = null; openingAttempted.value = ''; void loadSessions().catch(e => { error.value = String(e) }); void loadMasteryTopic() } })
 watch(readingWorkspaceId, () => { if (props.reading) void loadSessions().catch(e => { error.value = String(e) }) })
 watch(() => props.noteDocumentId, () => { if (props.noteDocumentId) void loadSessions().catch(e => { error.value = String(e) }) })
-onUnmounted(() => { if (attachmentErrorTimer) clearTimeout(attachmentErrorTimer); window.removeEventListener('storage', syncTrayFold); window.removeEventListener(TRAY_FOLD_EVENT, syncTrayFoldEvent); window.removeEventListener('deeptutor:voice-autoplay-global', handleVoiceAutoplayPreference); if (masteredTimer) clearTimeout(masteredTimer); askHintRequest += 1; document.removeEventListener('click', closeCapabilityMenu); document.removeEventListener('pointerdown', dismissSelection); trayRelease?.(); if (mediaRecorder?.state === 'recording') mediaRecorder.stop(); mediaStream?.getTracks().forEach(track => track.stop()); disposed = true; clearTimers(); if (idleWatchdog) clearInterval(idleWatchdog); socket?.close(); socket = null })
+onUnmounted(() => { if (attachmentErrorTimer) clearTimeout(attachmentErrorTimer); window.removeEventListener('storage', syncTrayFold); window.removeEventListener(TRAY_FOLD_EVENT, syncTrayFoldEvent); window.removeEventListener('deeptutor:voice-autoplay-global', handleVoiceAutoplayPreference); window.removeEventListener('resize', updateTrayPlacement); if (masteredTimer) clearTimeout(masteredTimer); askHintRequest += 1; document.removeEventListener('click', closeCapabilityMenu); document.removeEventListener('pointerdown', dismissSelection); trayRelease?.(); if (mediaRecorder?.state === 'recording') mediaRecorder.stop(); mediaStream?.getTracks().forEach(track => track.stop()); disposed = true; clearTimers(); if (idleWatchdog) clearInterval(idleWatchdog); socket?.close(); socket = null })
 watch(routeSessionId, () => {
   freshlyCompletedAssistantId.value = null
   editingMessage.value = null
@@ -1885,13 +1907,18 @@ function submitUserReply(payload?: string | { text?: string; answers?: Array<{ q
   const text = typeof payload === 'string' ? payload.trim() : (payload?.text || '').trim()
   const answers = typeof payload === 'object' ? payload?.answers : undefined
   if (!text && !answers?.length) return false
-  send({
+  const delivered = send({
     type: 'submit_user_reply',
     turn_id: activeTurnId,
     ...(text ? { text } : {}),
     ...(answers?.length ? { answers } : {}),
     command_id: commandId(),
   })
+  if (!delivered) {
+    error.value = '连接尚未恢复，请稍后重试回答。'
+    askUserRetryToken.value += 1
+    return false
+  }
   reply.value = ''
   waitingForReply.value = false
   return true
@@ -1964,12 +1991,6 @@ defineExpose({
             :status="row.outlineStatus"
             @confirm="confirmResearchOutline($event, researchOutlineFor(message))"
           />
-          <AskUserCard
-            v-if="message.role === 'assistant' && askUserFor(message, busy && row.originalIndex === visibleMessages.length - 1)"
-            :data="askUserFor(message, busy && row.originalIndex === visibleMessages.length - 1)!"
-            :disabled="!waitingForReply"
-            @submit="submitUserReply"
-          />
           <SetupCredentialCard
             v-if="setupCredentialFor(message)"
             :data="setupCredentialFor(message)!"
@@ -1985,6 +2006,13 @@ defineExpose({
                 ? Boolean(message.content)
                 : (!researchOutlineFor(message) || shouldShowResearchBody(message, row.outlineStatus)))"
             :content="message.content"
+          />
+          <AskUserCard
+            v-if="message.role === 'assistant' && askUserFor(message, busy && row.originalIndex === visibleMessages.length - 1)"
+            :data="askUserFor(message, busy && row.originalIndex === visibleMessages.length - 1)!"
+            :disabled="!waitingForReply"
+            :retry-token="askUserRetryToken"
+            @submit="submitUserReply"
           />
           <QuizViewer
             v-if="message.role === 'assistant' && quizQuestionsFor(message)"
@@ -2018,13 +2046,17 @@ defineExpose({
           <div class="chat-message-footer"><button v-if="message.role === 'assistant' && message.events?.length" type="button" class="chat-trace-open" @click="openTrace(message)"><LegacyIcon name="layers" :size="13" />调用追踪</button><ChatMessageActions v-if="editingMessage !== message.id" :content="message.content" :role="message.role" :sibling="messageSibling(message)" :can-edit="message.role === 'user' && typeof message.id === 'number' && message.id > 0" :can-regenerate="message.role === 'assistant' && row.originalIndex === visibleMessages.length - 1" :can-delete="canDeleteMessage(message, row.originalIndex)" :disabled="busy" :auto-play-fresh="freshlyCompletedAssistantId === message.id && row.originalIndex === visibleMessages.length - 1" :autoplay-enabled="voiceAutoplay" @edit="editMessage(message)" @regenerate="regenerate" @delete="deleteTurnForMessage(row.originalIndex)" @switch-branch="switchBranch" @failed="error = $event" /><ChatUsageFooter v-if="hasMessageUsage(message)" :turn="messageUsageFor(message)" :session="sessionUsageFor(row.originalIndex)" /></div>
           </template>
         </article>
-        <article v-if="streaming" class="message assistant"><small>DeepTutor</small><MarkdownView :content="streaming" /></article>
-        <AskUserCard
-          v-if="liveAskUserFor()"
-          :data="liveAskUserFor()!"
-          :disabled="!waitingForReply"
-          @submit="submitUserReply"
-        />
+        <article v-if="streaming || (busy && liveAskUserFor())" class="message assistant">
+          <small>DeepTutor</small>
+          <MarkdownView v-if="streaming" :content="streaming" />
+          <AskUserCard
+            v-if="busy && liveAskUserFor()"
+            :data="liveAskUserFor()!"
+            :disabled="!waitingForReply"
+            :retry-token="askUserRetryToken"
+            @submit="submitUserReply"
+          />
+        </article>
         <SetupCredentialCard v-if="liveSetupCredential" :data="liveSetupCredential" />
         <PartnerDraftCard v-if="livePartnerDraft" :data="livePartnerDraft" />
         <MasteryHandoffCard v-for="handoff in liveMasteryHandoffs" :key="`live:${handoff.kind}:${handoff.path_id}:${handoff.session_id}:${handoff.module_id}`" :data="handoff" />
@@ -2057,7 +2089,7 @@ defineExpose({
       </div>
       <form class="composer" :style="composerStyle" :class="{ 'dt-note-composer': noteDocumentId, 'is-dragging-files': draggingFiles }" @submit.prevent="submit" @dragenter="dragEnterAttachments" @dragleave="dragLeaveAttachments" @dragover="dragOverAttachments" @drop="dropAttachments">
         <p v-if="connection === 'recovering'" class="notice" role="status">正在恢复对话连接…</p>
-        <div v-if="waitingForReply" class="reply-form"><input v-model="reply" placeholder="回答 DeepTutor 的问题"><button type="button" class="primary" :disabled="!reply.trim()" @click="submitReply">回复</button></div>
+        <div v-if="waitingForReply && !liveAskUserFor()" class="reply-form"><input v-model="reply" placeholder="回答 DeepTutor 的问题"><button type="button" class="primary" :disabled="!reply.trim()" @click="submitReply">回复</button></div>
         <div v-if="selectedReferenceItems.length" class="selected-reference-chips context-reference-wrapper">
           <ContextReferenceTree
             :items="selectedReferenceItems"
@@ -2093,7 +2125,7 @@ defineExpose({
         <p v-if="notice" class="notice" role="status">{{ notice }}</p><p v-if="error" class="error" role="alert">{{ error }}</p><div v-if="failedSubmission" class="failed-submission" role="alert">有一条尚未确认发送的消息。<button type="button" @click="retryFailedSubmission">使用同一提交 ID 重试</button><button type="button" @click="clearFailedSubmission">放弃</button></div>
         <div class="composer-actions" :class="{ 'dt-note-composer-bar': noteDocumentId }"><input ref="fileInput" class="visually-hidden" type="file" multiple :accept="ATTACHMENT_ACCEPT" :disabled="busy" @change="attachFiles"><button v-if="noteDocumentId" type="button" class="dt-note-composer-make" :aria-pressed="Boolean(noteGeneration)" @click="emit('toggleMake')"><LegacyIcon name="sparkles" :size="13" />{{ noteGeneration?.label || '生成' }}</button><div v-if="!noteDocumentId && !reading && showSettings" class="chat-mode-resources"><button ref="resourceTrigger" type="button" class="chat-mode-trigger composer-resource-trigger" aria-label="资源" :aria-expanded="resourcesOpen" @click="toggleResources"><LegacyIcon name="plus" :size="17" :stroke-width="1.7" /><span>资源</span><LegacyIcon name="chevronRight" :size="13" /></button></div><button v-else type="button" :disabled="busy" aria-label="添加附件" @click="fileInput?.click()"><LegacyIcon v-if="noteDocumentId" name="attachment" :size="14" /><LegacyIcon v-else name="plus" :size="16" /></button><span class="composer-spacer" /><ModelSelector :options="llmOptions" :value="selectedModel" @select="selectedModel = $event" /><ContextBudgetChip v-if="contextBudget" :budget="contextBudget" /><button v-if="!mastery && !reading && !noteDocumentId && customization.chat.controls.voice" type="button" class="composer-voice" :class="{ 'is-recording': recording }" :aria-label="recording ? '停止录制' : '录制语音'" @click="toggleRecording"><LegacyIcon name="mic" :size="16" :stroke-width="1.9" /></button><button v-if="busy" type="button" class="primary" @click="cancel">停止</button><button v-else class="primary" :class="{ 'dt-note-composer-send': noteDocumentId }" :disabled="!prompt.trim() && !noteGeneration && !hasQueuedComposerContext" aria-label="发送"><span v-if="noteDocumentId">↑</span><template v-else>发送</template></button></div>
       </form>
-      <div v-if="!reading && !noteDocumentId" class="chat-mode-bar" :class="{ 'dt-composer-tray': true }" :data-folded="trayFolded || undefined" :data-placement="languagePickerBelow ? 'down' : 'up'" :data-dragging="trayDragging || undefined" :style="trayStyle" @pointerdown="onTrayPointerDown" @click="onTrayClick">
+      <div v-if="!reading && !noteDocumentId" ref="trayRef" class="chat-mode-bar" :class="{ 'dt-composer-tray': true }" :data-folded="trayFolded || undefined" :data-placement="languagePickerBelow ? 'down' : 'up'" :data-dragging="trayDragging || undefined" :style="trayStyle" @pointerdown="onTrayPointerDown" @click="onTrayClick">
         <span class="dt-tray-grip-anchor"><button type="button" class="dt-tray-grip" :title="trayFolded ? '展开' : '收起'" :aria-label="trayFolded ? '展开输入工具' : '收起输入工具'" :aria-expanded="!trayFolded" aria-controls="chat-composer-tray-bar" @keydown="onTrayGripKeyDown" /></span>
         <div id="chat-composer-tray-bar" class="dt-tray-bar chat-mode-bar-row" :inert="trayFolded" :aria-hidden="trayFolded">
         <div class="chat-mode-leading"><div v-if="!mastery && !reading && !noteDocumentId" class="capability-picker"><select v-model="selectedCapability" class="legacy-capability-select" aria-label="对话能力" tabindex="-1"><option v-for="capability in capabilities" :key="capability.id" :value="capability.id">{{ capability.id }}</option></select><button type="button" class="capability-trigger" :class="{ 'has-mode': selectedCapability !== 'chat' }" aria-label="模式" :aria-expanded="capabilityMenuOpen" aria-haspopup="menu" @click="capabilityMenuOpen = !capabilityMenuOpen; moreCapabilitiesOpen = false"><LegacyIcon name="shapes" :size="14" :stroke-width="1.7" /><span v-if="selectedCapability === 'chat'">模式</span><ComposerGlyph v-else class="mode-value-icon" :name="activeModeGlyph" :size="15" /><LegacyIcon v-if="selectedCapability === 'chat'" name="chevronDown" :size="12" :stroke-width="2" /></button><div v-if="capabilityMenuOpen" class="capability-menu" :class="{ below: languagePickerBelow }" role="menu"><button v-for="capability in presentedCapabilities" :key="capability.id" type="button" class="capability-menu-item" :class="{ selected: selectedCapability === capability.id }" role="menuitem" @click="chooseCapability(capability.id)"><ComposerGlyph :name="capabilityGlyph(capability.id)" :size="15" /><span class="capability-menu-copy"><strong>{{ capability.label }}</strong><small>{{ capability.description }}</small></span><span v-if="selectedCapability === capability.id" class="capability-check">✓</span></button></div></div></div>

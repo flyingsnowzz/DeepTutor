@@ -16,12 +16,20 @@ export async function setVoiceAutoplay(next: boolean): Promise<void> {
   cached = { autoplay: next, mathSpeak: cached?.mathSpeak ?? true }
   window.dispatchEvent(new CustomEvent('deeptutor:voice-autoplay-global', { detail: { value: next } }))
   try { await api('/api/settings/voice-autoplay', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voice_autoplay: next }) }) }
-  catch (cause) { cached = previous; throw cause }
+  catch (cause) {
+    cached = previous
+    window.dispatchEvent(new CustomEvent('deeptutor:voice-autoplay-global', { detail: { value: previous?.autoplay ?? false } }))
+    throw cause
+  }
 }
 export async function setVoiceMathSpeak(next: boolean): Promise<void> {
   const previous = cached
   cached = { autoplay: cached?.autoplay ?? false, mathSpeak: next }
   window.dispatchEvent(new CustomEvent('deeptutor:voice-math-speak', { detail: { value: next } }))
   try { await api('/api/settings/voice-math-speak', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voice_math_speak: next }) }) }
-  catch (cause) { cached = previous; throw cause }
+  catch (cause) {
+    cached = previous
+    window.dispatchEvent(new CustomEvent('deeptutor:voice-math-speak', { detail: { value: previous?.mathSpeak ?? true } }))
+    throw cause
+  }
 }

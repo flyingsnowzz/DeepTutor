@@ -42,7 +42,7 @@ onUnmounted(() => { document.removeEventListener('click', outside); document.rem
 
 <template>
   <div ref="root" class="model-selector">
-    <button type="button" class="model-selector-trigger" aria-label="选择模型" :aria-expanded="open" :disabled="!options.length" @click="open = !open"><LegacyIcon name="model" :size="16" /><span class="model-selector-label" :class="{ show: showLabel }"><span>{{ label }}</span><LegacyIcon name="chevronDown" :size="12" /></span></button>
+    <button type="button" class="model-selector-trigger" :class="{ 'is-expanded': open || showLabel }" aria-label="选择模型" :aria-expanded="open" :disabled="!options.length" @click="open = !open"><LegacyIcon name="model" :size="16" /><span class="model-selector-label" :class="{ show: showLabel }"><span>{{ label }}</span><LegacyIcon name="chevronDown" :size="12" /></span></button>
     <div v-if="open" class="model-selector-menu" role="dialog" aria-label="选择模型">
       <button v-for="option in options" :key="`${option.profile_id}:${option.model_id}`" type="button" role="option" :aria-selected="`${option.profile_id}:${option.model_id}` === value" @click="choose(`${option.profile_id}:${option.model_id}`)">
         <LegacyIcon name="model" :size="14" />

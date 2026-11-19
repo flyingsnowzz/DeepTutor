@@ -47,6 +47,15 @@ describe('ask user card', () => {
     expect(extractAskUserPayload([{ type: 'progress', metadata: { ask_user_draft: { intro: 'x' } } }])).toBeNull()
   })
 
+  it('keeps the dispatched card when a late draft for the same call arrives', () => {
+    const card = extractAskUserPayload([
+      { type: 'tool_result', tool_call_id: 'call123|item1', metadata: { tool_metadata: { ask_user: { question: 'Which value?', options: ['A', 'B'] } } } },
+      { type: 'progress', metadata: { draft_call_id: 'call123', ask_user_draft: { intro: 'Still writing', questions: [] } } },
+    ], { streaming: true })
+    expect(card?.streaming).toBeFalsy()
+    expect(card?.payload.questions[0]?.prompt).toBe('Which value?')
+  })
+
   it('marks the matching tool call resolved with structured answers', () => {
     const card = extractAskUserPayload([
       {

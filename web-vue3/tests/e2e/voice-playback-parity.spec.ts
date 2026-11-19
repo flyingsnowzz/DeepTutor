@@ -18,7 +18,7 @@ test('voice settings restore playback toggles and persist each preference indepe
     return route.fulfill({ json: {} })
   })
   await page.goto('/settings/voice')
-  const autoplay = page.getByRole('switch', { name: '自动播放回复', exact: true })
+  const autoplay = page.getByRole('switch', { name: '自动朗读回复', exact: true })
   const mathSpeak = page.getByRole('switch', { name: '数学朗读', exact: true })
   await expect(autoplay).toHaveAttribute('aria-checked', 'false')
   await expect(mathSpeak).toHaveAttribute('aria-checked', 'true')
@@ -30,6 +30,32 @@ test('voice settings restore playback toggles and persist each preference indepe
   await expect.poll(() => writes.length).toBe(2)
   expect(writes[1]).toEqual({ path: '/api/settings/voice-math-speak', body: { voice_math_speak: false } })
   await expect(mathSpeak).toHaveAttribute('aria-checked', 'false')
+})
+
+test('voice preferences follow English and restore global state after a failed save', async ({ page }) => {
+  await page.addInitScript(() => {
+    ;(window as unknown as { __voiceEvents: boolean[] }).__voiceEvents = []
+    window.addEventListener('deeptutor:voice-autoplay-global', event => {
+      ;(window as unknown as { __voiceEvents: boolean[] }).__voiceEvents.push(Boolean((event as CustomEvent).detail?.value))
+    })
+  })
+  await page.route('**/api/**', route => {
+    const path = new URL(route.request().url()).pathname
+    if (path === '/api/auth/status') return route.fulfill({ json: { enabled: false, authenticated: false, is_admin: true } })
+    if (path === '/api/settings') return route.fulfill({ json: { ui: { language: 'en', voice_autoplay: false, voice_math_speak: true } } })
+    if (path === '/api/settings/voice-autoplay') return route.fulfill({ status: 503, json: { detail: 'Unavailable' } })
+    return route.fulfill({ json: {} })
+  })
+  await page.goto('/settings/voice')
+  await expect(page.getByRole('heading', { name: 'Voice services' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Playback' })).toBeVisible()
+  const autoplay = page.getByRole('switch', { name: 'Auto-play replies' })
+  await expect(autoplay).toHaveAttribute('aria-checked', 'false')
+  await expect(page.getByRole('switch', { name: 'Math speak' })).toBeEnabled()
+  await autoplay.click()
+  await expect(page.locator('.voice-playback-preferences [role="alert"]')).toBeVisible()
+  await expect(autoplay).toHaveAttribute('aria-checked', 'false')
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __voiceEvents: boolean[] }).__voiceEvents)).toEqual([true, false])
 })
 
 test('autoplay runs only for a freshly completed reply and never for loaded history', async ({ page }) => {

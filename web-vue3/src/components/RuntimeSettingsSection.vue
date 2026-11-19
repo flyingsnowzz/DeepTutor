@@ -13,15 +13,13 @@ import CapabilitiesSettings from './CapabilitiesSettings.vue'
 import WorkspaceSettings from './WorkspaceSettings.vue'
 import DataMigrationSettings from './DataMigrationSettings.vue'
 
-const props = withDefaults(defineProps<{ section: string; pending?: unknown; mineruPending?: unknown; revision?: number }>(), { revision: 0 })
-const emit = defineEmits<{ change: [value: Record<string, any>]; loaded: [value: Record<string, any>]; mineruChange: [value: Record<string, any>]; mineruLoaded: [value: Record<string, any>] }>()
+const props = withDefaults(defineProps<{ section: string; pending?: unknown; mineruPending?: unknown; updateChecksPending?: { enabled: boolean }; revision?: number; language?: string }>(), { revision: 0 })
+const emit = defineEmits<{ change: [value: Record<string, any>]; loaded: [value: Record<string, any>]; mineruChange: [value: Record<string, any>]; mineruLoaded: [value: Record<string, any>]; updateChecksChange: [value: { enabled: boolean }]; updateChecksLoaded: [value: { enabled: boolean }] }>()
 const parsingEngine = ref('')
 const data = ref<Record<string, any>>({})
 const error = ref('')
 const notice = ref('')
 const busy = ref(false)
-const usage = ref<any>(null)
-const year = ref(new Date().getFullYear())
 const workspaces = ref<any[]>([])
 const workspaceDraft = ref({ display_name: '', path: '', instructions: '' })
 const migration = ref<{ features: { feature: string; label?: string; files: number; bytes: number }[]; transfer_available: boolean } | null>(null)
@@ -33,15 +31,12 @@ const operations = ref<any[]>([])
 const update = ref<any>(null)
 const endpoints: Record<string, string> = { capabilities: '/api/capabilities/settings', memory: '/api/memory/settings', knowledge: '/api/settings/document-parsing', 'video-learning': '/api/settings/video-learning' }
 async function load() {
+  // These pages own their loading, validation, and draft baseline. A second
+  // parent read could overwrite the baseline after the child has reloaded.
+  if (endpoints[props.section]) return
   error.value = ''
   try {
-    if (endpoints[props.section]) {
-      const live = await api<Record<string, any>>(endpoints[props.section])
-      data.value = (props.pending as Record<string, any> | undefined) ?? live
-      emit('loaded', live)
-    }
-    else if (props.section === 'usage') usage.value = await api(`/api/usage?year=${year.value}`)
-    else if (props.section === 'workspace') workspaces.value = (await api<{ workspaces: any[] }>('/api/settings/workspace/registrations')).workspaces
+    if (props.section === 'workspace') workspaces.value = (await api<{ workspaces: any[] }>('/api/settings/workspace/registrations')).workspaces
     else if (props.section === 'data-migration') { workspaces.value = (await api<{ workspaces: any[] }>('/api/settings/workspace/registrations')).workspaces; migrationSource.value = workspaces.value[0]?.workspace_id || ''; await Promise.all([loadMigrationDiscovery(), loadOperations()]) }
     else if (props.section === 'about') update.value = await api('/api/system/update')
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '设置加载失败' }
@@ -87,16 +82,16 @@ function toggleFeature(id: string) { if (migrationFeatures.value.has(id)) migrat
 
 <template>
   <section><p v-if="error" class="error" role="alert">{{ error }}</p><p v-if="notice" class="notice" role="status">{{ notice }}</p>
-    <WorkspaceSettings v-if="section === 'workspace'" />
-    <CapabilitiesSettings v-else-if="section === 'capabilities'" :pending="pending" :revision="revision" @change="emit('change', $event)" @loaded="emit('loaded', $event)" />
-    <MemorySettings v-else-if="section === 'memory'" :pending="pending" :revision="revision" @change="emit('change', $event)" @loaded="emit('loaded', $event)" />
+    <WorkspaceSettings v-if="section === 'workspace'" :language="language" />
+    <CapabilitiesSettings v-else-if="section === 'capabilities'" :pending="pending" :revision="revision" :language="language" @change="emit('change', $event)" @loaded="emit('loaded', $event)" />
+    <MemorySettings v-else-if="section === 'memory'" :pending="pending" :revision="revision" :language="language" @change="emit('change', $event)" @loaded="emit('loaded', $event)" />
     <DocumentParsingSettings v-else-if="section === 'knowledge'" :pending="pending" :revision="revision" @change="emit('change', $event)" @loaded="emit('loaded', $event)" @engine-change="parsingEngine = $event" />
     <MinerUSettings v-if="section === 'knowledge' && parsingEngine === 'mineru'" :pending="mineruPending" :revision="revision" @change="emit('mineruChange', $event)" @loaded="emit('mineruLoaded', $event)" />
-    <VideoLearningSettings v-else-if="section === 'video-learning'" :pending="pending" :revision="revision" @change="emit('change', $event)" @loaded="emit('loaded', $event)" />
+    <VideoLearningSettings v-else-if="section === 'video-learning'" :pending="pending" :revision="revision" :language="language" @change="emit('change', $event)" @loaded="emit('loaded', $event)" />
     <template v-else-if="endpoints[section]"><header class="legacy-settings-page-header"><h1>{{ { capabilities: '能力', memory: '记忆', knowledge: '知识与文档', 'video-learning': '视频学习' }[section] }}</h1><p>{{ { capabilities: '配置各能力的模型参数与运行时选项。', memory: '分块、预算、去重与引用策略。', knowledge: '文档解析引擎与图片说明模型。', 'video-learning': '原生 YouTube 与本地 Invidious 播放供应商。' }[section] }}</p></header><div @input="changed" @change="changed"><EngineConfigForm v-model="data" /></div></template>
     <UsageSettings v-else-if="section === 'usage'" />
     <DataMigrationSettings v-else-if="section === 'data-migration'" />
     <template v-else-if="section === 'archive'"><ChatHistoryPage /></template>
-    <AboutSettings v-else-if="section === 'about'" />
+    <AboutSettings v-else-if="section === 'about'" :pending="updateChecksPending" :revision="revision" @change="emit('updateChecksChange', $event)" @loaded="emit('updateChecksLoaded', $event)" />
   </section>
 </template>

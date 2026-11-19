@@ -777,9 +777,10 @@ describe('ChatPage ask_user interaction', () => {
         },
       },
     })
-    socket.emit({ type: 'wait_for_input', session_id: 'ask1', turn_id: 'turn1', seq: 3 })
     await flushPromises()
     expect(wrapper.find('.ask-user-card').exists()).toBe(true)
+    expect(wrapper.findAll('.ask-user-options button')[0]!.attributes('disabled')).toBeUndefined()
+    expect(wrapper.find('.reply-form').exists()).toBe(false)
     await wrapper.findAll('.ask-user-options button')[0]!.trigger('click')
     await wrapper.get('.ask-user-submit').trigger('click')
     const reply = socket.sent.find(message => message.type === 'submit_user_reply')
@@ -788,5 +789,9 @@ describe('ChatPage ask_user interaction', () => {
       text: 'Fast',
       answers: [{ questionId: 'pace', text: 'Fast' }],
     })
+    socket.emit({ type: 'command_ack', command_type: 'submit_user_reply', accepted: false, message: 'Try again' })
+    await flushPromises()
+    expect(wrapper.get('.ask-user-submit').attributes('disabled')).toBeUndefined()
+    expect(wrapper.text()).toContain('Try again')
   })
 })

@@ -143,6 +143,7 @@
 }
 .chat-shell.is-new-conversation .chat-mode-bar .capability-trigger{padding:0 7px}
 .chat-shell.is-new-conversation .dt-starter-card{top:calc(100% + 8px);left:0;right:0;width:auto;margin:0 auto;transform:none}
+.chat-shell.is-new-conversation .dt-starter-card.above{top:auto;bottom:calc(100% + 8px)}
 
 /* React modern warm-neutral tokens, scoped to avoid regressing other Vue pages. */
 .chat-shell.is-new-conversation{
@@ -180,6 +181,9 @@
 .chat-shell.is-new-conversation .composer-resource-trigger[aria-expanded=true]{background:var(--muted)}
 .chat-shell.is-new-conversation .model-selector-trigger{width:32px;height:32px;padding:0;justify-content:center;background:transparent}
 .chat-shell.is-new-conversation .model-selector-trigger:disabled{color:var(--border);cursor:not-allowed}
+.chat-shell.is-new-conversation .model-selector-trigger:hover,
+.chat-shell.is-new-conversation .model-selector-trigger:focus,
+.chat-shell.is-new-conversation .model-selector-trigger.is-expanded{width:auto;padding:0 7px}
 .chat-shell.is-new-conversation .composer-voice{width:32px;height:32px;border-radius:10px;background:transparent}
 .chat-shell.is-new-conversation .composer-actions .primary{margin-left:4px}
 .chat-shell.is-new-conversation .composer-actions .primary:disabled{opacity:1}
@@ -215,6 +219,9 @@
 .chat-shell.is-standard-conversation .composer-resource-trigger{width:33px;height:32px;padding:0;justify-content:center;background:transparent}
 .chat-shell.is-standard-conversation .model-selector-trigger{width:32px;height:32px;padding:0;justify-content:center;background:transparent}
 .chat-shell.is-standard-conversation .model-selector-trigger:disabled{opacity:1;color:var(--border);cursor:not-allowed}
+.chat-shell.is-standard-conversation .model-selector-trigger:hover,
+.chat-shell.is-standard-conversation .model-selector-trigger:focus,
+.chat-shell.is-standard-conversation .model-selector-trigger.is-expanded{width:auto;padding:0 7px}
 .chat-shell.is-standard-conversation .composer-voice{width:32px;height:32px;border-radius:10px;background:transparent}
 .chat-shell.is-standard-conversation .composer-actions .primary{margin-left:4px}
 .chat-shell.is-standard-conversation .dt-duo{fill:currentColor;fill-opacity:.16}

@@ -80,18 +80,20 @@ test('tool search, details and toggles stage the real enabled-tool list', async 
   await expect(page.getByText(/Search query/)).toBeVisible()
 })
 
-test('model workspace adds a profile and applies the selected service config', async ({ page }) => {
+test('model workspace adds a profile and applies the shared catalog draft', async ({ page }) => {
   const catalog = { services: {
     llm: { active_profile_id: 'p1', active_model_id: 'm1', profiles: [{ id: 'p1', name: 'Provider', provider: 'openai', models: [{ id: 'm1', model: 'gpt-test', name: 'Test model' }] }] },
     task: { active_profile_id: null, active_model_id: null, profiles: [], mode: 'inherit', overrides: {} },
   } }
   await page.route('**/api/auth/status*', route => route.fulfill({ json: { enabled: false, authenticated: false, is_admin: true } }))
   await page.route('**/api/settings?*', route => route.fulfill({ json: { catalog, ui: { language: 'zh', theme: 'snow' }, task_kinds: [] } }))
-  await page.route('**/api/settings/draft?*', route => route.fulfill({ json: { draft: null } }))
-  let applied: { service?: string; config?: { profiles?: { id: string }[] } } | null = null
-  await page.route('**/api/settings/apply/service?*', route => {
-    applied = route.request().postDataJSON()
-    return route.fulfill({ json: {} })
+  let staged: { catalog?: { services?: { llm?: { profiles?: { id: string }[] } } } } | null = null
+  await page.route('**/api/settings/draft?*', route => {
+    if (route.request().method() === 'PUT') staged = route.request().postDataJSON()
+    return route.fulfill({ json: route.request().method() === 'GET' ? { draft: null } : {} })
+  })
+  await page.route('**/api/settings/apply?*', route => {
+    return route.fulfill({ json: { catalog: staged?.catalog } })
   })
   await page.goto('/settings/llm')
   await expect(page.locator('.model-rail-card')).toHaveCount(1)
@@ -103,11 +105,10 @@ test('model workspace adds a profile and applies the selected service config', a
   await page.getByLabel('Profile API Key', { exact: true }).fill('test-only')
   await page.getByLabel('首个模型 ID', { exact: true }).fill('test-model')
   await page.getByRole('button', { name: '添加 Profile', exact: true }).click()
-  await expect(page.locator('.model-catalog-toolbar')).toContainText('有未保存的更改')
+  await expect(page.locator('.legacy-settings-toolbar')).toContainText('有未保存的更改')
   await page.getByRole('button', { name: '应用更改', exact: true }).click()
-  await expect(page.locator('.model-catalog-toast')).toHaveText('模型配置已应用')
-  expect(applied?.service).toBe('llm')
-  expect(applied?.config?.profiles?.some(profile => profile.id === 'personal-llm')).toBe(true)
+  await expect(page.locator('.legacy-settings-toast')).toHaveText('已应用')
+  expect(staged?.catalog?.services?.llm?.profiles?.some(profile => profile.id === 'personal-llm')).toBe(true)
 })
 
 test('model connection test streams results and adopts detected context explicitly', async ({ page }) => {
@@ -128,17 +129,50 @@ test('model connection test streams results and adopts detected context explicit
     ].join(''),
   }))
   let appliedModel: { context_window?: string } | null = null
-  await page.route('**/api/settings/apply/service?*', route => {
-    const body = route.request().postDataJSON()
-    appliedModel = body.config.profiles[0].models[0]
-    return route.fulfill({ json: {} })
+  await page.route('**/api/settings/draft?*', route => {
+    if (route.request().method() === 'PUT') appliedModel = route.request().postDataJSON().catalog.services.llm.profiles[0].models[0]
+    return route.fulfill({ json: route.request().method() === 'GET' ? { draft: null } : {} })
+  })
+  await page.route('**/api/settings/apply?*', route => {
+    return route.fulfill({ json: { catalog } })
   })
   await page.goto('/settings/llm')
   await page.getByRole('button', { name: '测试模型', exact: true }).click()
   await expect(page.getByText('模型响应成功', { exact: true })).toBeVisible()
-  await expect(page.getByText('检测到上下文：128000 tokens', { exact: true })).toBeVisible()
+  await expect(page.getByText('检测到上下文窗口：128000 tokens', { exact: true })).toBeVisible()
+  await page.locator('a[href="/settings/tools"]').first().click()
+  await expect(page).toHaveURL(/\/settings\/tools$/)
+  await page.locator('a[href="/settings/llm"]').first().click()
+  await expect(page.getByText('检测到上下文窗口：128000 tokens', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '采用检测值', exact: true }).click()
+  await expect(page.getByRole('button', { name: '已采用' })).toBeDisabled()
+  await expect(page.getByText('配置已修改，请重新测试以验证当前设置。')).toHaveCount(0)
   await page.getByRole('button', { name: '应用更改', exact: true }).click()
-  await expect(page.locator('.model-catalog-toast')).toHaveText('模型配置已应用')
+  await expect(page.locator('.legacy-settings-toast')).toHaveText('已应用')
   expect(appliedModel?.context_window).toBe('128000')
+})
+
+test('model test continues while another settings section is open', async ({ page }) => {
+  const catalog = { services: { llm: { active_profile_id: 'p1', active_model_id: 'm1', profiles: [{ id: 'p1', name: 'Provider', provider: 'openai', models: [{ id: 'm1', model: 'gpt-test' }] }] } } }
+  await page.route('**/api/auth/status*', route => route.fulfill({ json: { enabled: false, authenticated: false, is_admin: true } }))
+  await page.route('**/api/settings?*', route => route.fulfill({ json: { catalog, ui: { language: 'zh' } } }))
+  await page.route('**/api/settings/draft?*', route => route.fulfill({ json: { draft: null } }))
+  await page.route('**/api/tools*', route => route.fulfill({ json: { tools: [], enabled_optional_tools: [] } }))
+  await page.route('**/api/settings/tests/llm/start?*', route => route.fulfill({ json: { run_id: 'slow-run' } }))
+  let releaseStream!: () => void
+  const streamReleased = new Promise<void>(resolve => { releaseStream = resolve })
+  let streamStarted = false
+  await page.route('**/api/settings/tests/llm/slow-run/events?*', async route => {
+    streamStarted = true
+    await streamReleased
+    await route.fulfill({ contentType: 'text/event-stream', body: 'data: {"type":"completed","message":"Done"}\n\n' })
+  })
+  await page.goto('/settings/llm')
+  await page.getByRole('button', { name: '测试模型', exact: true }).click()
+  await expect.poll(() => streamStarted).toBe(true)
+  await page.locator('a[href="/settings/tools"]').first().click()
+  await expect(page).toHaveURL(/\/settings\/tools$/)
+  releaseStream()
+  await page.locator('a[href="/settings/llm"]').first().click()
+  await expect(page.getByText('模型响应成功', { exact: true })).toBeVisible()
 })

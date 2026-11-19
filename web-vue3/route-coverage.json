@@ -267,12 +267,12 @@
   {
     "route": "/settings",
     "source": "web/app/(settings)/settings/page.tsx",
-    "status": "complete"
+    "status": "in_progress"
   },
   {
     "route": "/settings/:section",
     "source": "web/app/(settings)/settings/[section]/page.tsx",
-    "status": "complete"
+    "status": "in_progress"
   },
   {
     "route": "/settings/progress",

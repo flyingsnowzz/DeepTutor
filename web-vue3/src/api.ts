@@ -61,11 +61,12 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body as T
 }
 
-export function post<T>(path: string, value: unknown): Promise<T> {
+export function post<T>(path: string, value: unknown, init: RequestInit = {}): Promise<T> {
   return api<T>(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(value),
+    ...init,
   })
 }
 

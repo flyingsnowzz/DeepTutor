@@ -1,3 +1,4 @@
+@import 'katex/dist/katex.min.css';
 @import './style.base.css';
 @import './legacy-theme.css';
 @import './legacy-setup.css';
@@ -77,3 +78,4 @@
 @import './legacy-backend-notice.css';
 
 @import './legacy-viewer-panel.css';
+@import './composer-web-parity.css';

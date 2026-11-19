@@ -9,8 +9,7 @@ interface PresetsResponse {
   presets: SettingsPreset[]
 }
 
-const props = defineProps<{ enabled?: boolean }>()
-const emit = defineEmits<{ staged: [presetId: string] }>()
+const props = defineProps<{ enabled?: boolean; stagePreset?: (presetId: string) => Promise<boolean> }>()
 
 const presets = ref<SettingsPreset[] | null>(null)
 const loading = ref(false)
@@ -35,12 +34,7 @@ async function loadDraft(preset: SettingsPreset) {
   if (activeId.value) return
   activeId.value = preset.id
   try {
-    // Stage into the existing draft envelope; backend merges without touching live settings.
-    await api(`/api/settings/presets/${encodeURIComponent(preset.id)}/draft`, {
-      method: 'POST',
-      body: JSON.stringify({ extensions: {} }),
-    })
-    emit('staged', preset.id)
+    if (!props.stagePreset || !await props.stagePreset(preset.id)) throw new Error('加载预设草稿失败。')
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : '加载预设草稿失败。'
   } finally {

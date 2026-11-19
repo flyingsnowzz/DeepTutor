@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "node ./scripts/dev.mjs",
+    "dev": "node ./scripts/dev.mjs --port 3782",
     "predev": "node ./scripts/copy-pdfjs-assets.mjs",
-    "dev:turbo": "node ./scripts/dev.mjs --turbopack",
+    "dev:turbo": "node ./scripts/dev.mjs --turbopack --port 3782",
     "predev:turbo": "node ./scripts/copy-pdfjs-assets.mjs",
     "build": "node ./scripts/build.mjs",
     "start": "next start",

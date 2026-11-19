@@ -11,7 +11,6 @@ import {
   isLoopbackHostname,
   logoutCodex,
   refreshCodexModels,
-  setCodexReasoningEffort,
   shouldPollCodexStatus,
   startCodexLogin,
   type CodexLoginStart,
@@ -21,7 +20,8 @@ import {
 } from '../providerAuth'
 
 /** Vue3 port of web/components/settings/CodexOAuthCard.tsx. */
-const emit = defineEmits<{ catalogChanged: [] }>()
+const props = defineProps<{ pendingEfforts?: Record<string, string | null>; revision?: number }>()
+const emit = defineEmits<{ catalogChanged: []; reasoningChanged: [value: Record<string, string | null>]; reasoningLoaded: [value: Record<string, string | null>] }>()
 
 const status = ref<CodexOAuthStatus | null>(null)
 const pending = ref(false)
@@ -60,7 +60,9 @@ const statusText = computed(() => {
 
 function applyStatus(next: CodexOAuthStatus) {
   status.value = next
-  efforts.value = Object.fromEntries(next.models.map(model => [model.model, model.reasoning_effort || null]))
+  const live = Object.fromEntries(next.models.map(model => [model.model, model.reasoning_effort || null]))
+  emit('reasoningLoaded', live)
+  efforts.value = props.pendingEfforts ? { ...props.pendingEfforts } : live
   const terminal = ['completed', 'cancelled', 'expired', 'failed'].includes(next.operation_state ?? '')
   if (terminal) {
     callbackUrl.value = ''
@@ -95,6 +97,7 @@ function schedulePoll() {
 }
 
 onMounted(loadStatus)
+watch(() => props.revision, () => { void loadStatus() })
 onBeforeUnmount(() => { if (pollTimer !== null) window.clearTimeout(pollTimer) })
 
 watch([status, pending], schedulePoll)
@@ -213,13 +216,9 @@ function reasoningOptions(model: CodexReasoningModel): { value: string; label: s
     .map(value => ({ value, label: labels[value] ?? value }))
 }
 
-async function changeReasoning(model: CodexReasoningModel, value: string) {
+function changeReasoning(model: CodexReasoningModel, value: string) {
   efforts.value = { ...efforts.value, [model.model]: value || null }
-  try {
-    applyStatus(await setCodexReasoningEffort(model.model, value || null))
-  } catch (cause) {
-    errorText.value = codexErrorMessage(errorCode(cause), cause instanceof Error ? cause.message : undefined)
-  }
+  emit('reasoningChanged', { ...efforts.value })
 }
 </script>
 

@@ -1,0 +1,20 @@
+import { expect, test } from '@playwright/test'
+
+test('network setting fields and status tiles follow the applied English language', async ({ page }) => {
+  await page.route('**/api/auth/status*', route => route.fulfill({ json: { enabled: true, authenticated: true, is_admin: true } }))
+  await page.route('**/api/settings?*', route => route.fulfill({ json: { ui: { language: 'en', theme: 'snow' } } }))
+  await page.route('**/api/settings/draft?*', route => route.fulfill({ json: { draft: null } }))
+  await page.route('**/api/settings/network*', route => route.fulfill({ json: { settings: { backend_port: 8001, frontend_port: 3783, public_api_base: '', cors_origins: [] }, effective: { browser_api_base: 'http://localhost:8001', cors_mode: 'permissive' }, auth: { enabled: true, cookie_secure: true, cookie_samesite: 'Lax', cross_site_cookie_ready: true }, restart_required: true } }))
+  await page.route('**/api/system/runtime*', route => route.fulfill({ json: { runtime_status: { worker_id: 'worker-1', worker_count: 2, coordination_mode: 'redis', redis_configured: true, redis_status: 'ok', leader_id: 'worker-1', leader_healthy: true, owner_turn_count: 0, recovery_backlog: 0, lease_ttl_seconds: 30, renew_interval_seconds: 10, recovery_interval_seconds: 5 } } }))
+  await page.goto('/settings/network')
+  await expect(page.getByRole('heading', { name: 'Network', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Runtime ports' })).toBeVisible()
+  await expect(page.getByRole('spinbutton', { name: 'Backend port' })).toHaveValue('8001')
+  await expect(page.getByRole('textbox', { name: 'Public API base' })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: 'CORS origins' })).toBeVisible()
+  await expect(page.getByText('Permissive until auth is enabled')).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Turn runtime/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Turn coordination' })).toBeVisible()
+  await expect(page.getByRole('spinbutton', { name: 'Backend workers' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Refresh' })).toBeVisible()
+})

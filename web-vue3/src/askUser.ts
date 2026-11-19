@@ -114,6 +114,10 @@ function readDraft(event: AskUserLikeEvent): { payload: AskUserPayload; callKey:
   }
 }
 
+function callKey(value: string | null): string | null {
+  return value?.split('|', 1)[0] || null
+}
+
 /** Extract the latest interactive/resolved ask_user card from an event stream. */
 export function extractAskUserPayload(
   events: AskUserLikeEvent[] | undefined,
@@ -141,6 +145,7 @@ export function extractAskUserPayload(
     if (options.streaming) {
       const draft = readDraft(event)
       if (draft) {
+        if (latest && !latest.streaming && draft.callKey === callKey(latest.toolCallId)) continue
         latest = { payload: draft.payload, toolCallId: draft.callKey, streaming: true }
         resolution = null
         continue
@@ -163,8 +168,8 @@ export function extractAskUserPayload(
     }
   }
 
-  if (!latest) return null
-  if (resolution && (resolution.toolCallId === latest.toolCallId || latest.toolCallId === null)) {
+  if (!latest || (latest.streaming && !options.streaming)) return null
+  if (resolution && (callKey(resolution.toolCallId) === callKey(latest.toolCallId) || latest.toolCallId === null)) {
     const answers = resolution.answers.length
       ? resolution.answers
       : latest.payload.questions[0]

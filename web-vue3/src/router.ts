@@ -132,7 +132,7 @@ router.beforeEach(async to => {
     if (!status.enabled) return true
     if (status.authenticated) {
       if (to.matched.some(route => route.meta.admin) && !status.is_admin) return '/chat'
-      if (status.is_admin && !to.matched.some(route => route.meta.admin)) return '/admin/users'
+      if (status.is_admin && !to.matched.some(route => route.meta.admin) && !to.path.startsWith('/settings')) return '/admin/users'
       return true
     }
     const login = to.matched.some(route => route.meta.admin) ? '/admin/login' : '/login'

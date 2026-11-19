@@ -45,7 +45,10 @@ const props = defineProps<{
   profile: CatalogProfile
   model: CatalogModel | null
   binding?: string
+  language?: string
 }>()
+const zh = computed(() => props.language !== 'en')
+const tr = (cn: string, en: string) => zh.value ? cn : en
 
 const CAPABILITY_ROWS: { key: CapabilityKey; label: string }[] = [
   { key: 'tools', label: '工具调用（Tool calling）' },
@@ -67,6 +70,11 @@ const FIELD_LABELS: Record<string, string> = {
   duration: '时长（秒）',
   resolution: '分辨率',
 }
+const FIELD_LABELS_EN: Record<string, string> = {
+  dimension: 'Dimensions', supported_dimensions: 'Supported dimensions', voice: 'Voice',
+  response_format: 'Response format', language: 'Language', size: 'Image size', quality: 'Quality',
+  style: 'Style', aspect_ratio: 'Aspect ratio', duration: 'Duration (seconds)', resolution: 'Resolution',
+}
 
 /** Mirrors ModelsWorkspace: model.managed_by || profile.read_only || profile.managed_by. */
 const managed = computed(() => Boolean(props.model?.managed_by || props.profile?.read_only || props.profile?.managed_by))
@@ -75,18 +83,19 @@ const contextWindowValue = computed(() => props.model?.context_window ?? (props.
 const hasContextOverride = computed(() => Boolean(props.model?.context_window || props.model?.context_window_tokens != null))
 
 const extraFields = computed<[keyof CatalogModel, string][]>(() => {
+  const labels = zh.value ? FIELD_LABELS : FIELD_LABELS_EN
   switch (props.service) {
     case 'embedding':
-      return [['dimension', FIELD_LABELS.dimension], ['supported_dimensions', FIELD_LABELS.supported_dimensions]]
+      return [['dimension', labels.dimension], ['supported_dimensions', labels.supported_dimensions]]
     case 'tts':
       // Voice selection is owned by VoiceDiscoveryField (live lookup + manual ID).
-      return [['response_format', FIELD_LABELS.response_format]]
+      return [['response_format', labels.response_format]]
     case 'stt':
-      return [['language', FIELD_LABELS.language]]
+      return [['language', labels.language]]
     case 'imagegen':
-      return [['size', FIELD_LABELS.size], ['quality', FIELD_LABELS.quality], ['style', FIELD_LABELS.style], ['response_format', FIELD_LABELS.response_format]]
+      return [['size', labels.size], ['quality', labels.quality], ['style', labels.style], ['response_format', labels.response_format]]
     case 'videogen':
-      return [['aspect_ratio', FIELD_LABELS.aspect_ratio], ['duration', FIELD_LABELS.duration], ['resolution', FIELD_LABELS.resolution]]
+      return [['aspect_ratio', labels.aspect_ratio], ['duration', labels.duration], ['resolution', labels.resolution]]
     default:
       return []
   }
@@ -103,7 +112,7 @@ function update(field: keyof CatalogModel, value: unknown) {
   if (!props.model) return
   const target = props.model
   // A signed-in provider still permits renaming, persisted separately as user_name.
-  if (managed.value && field !== 'name') return
+  if (managed.value && field !== 'name' && field !== 'reasoning_effort') return
   if (field === 'context_window') {
     const raw = String(value)
     if (raw) {
@@ -121,6 +130,9 @@ function update(field: keyof CatalogModel, value: unknown) {
   if (field === 'name' && managed.value) {
     target.user_name = String(value)
     return
+  }
+  if (field === 'model' && (!target.name || target.name === target.model)) {
+    target.name = String(value)
   }
   if (field === 'name') target.name = String(value)
   ;(target as Record<string, unknown>)[field as string] = value
@@ -160,15 +172,14 @@ function setSendDimensions(raw: string) {
 
 /** Auto values reported by the backend capability tables (ModelCapabilityFields parity). */
 const autoDefaults = ref<Partial<Record<CapabilityKey, boolean>> | null>(null)
-const autoModelKey = ref('')
+let autoRequestVersion = 0
 watch(
   () => ({ binding: props.binding, modelName: props.model?.model, modelId: props.model?.id, language: isLanguageService.value }),
   ({ binding, modelName }, _old, onCleanup) => {
+    const version = ++autoRequestVersion
     autoDefaults.value = null
     if (!modelName || !isLanguageService.value) return
     const modelNameText = String(modelName)
-    const key = `${binding ?? ''}:${modelNameText}`
-    autoModelKey.value = key
     const handle = window.setTimeout(async () => {
       try {
         const payload = await api<{ defaults?: Partial<Record<CapabilityKey, boolean>> }>('/api/settings/model-capabilities', {
@@ -176,20 +187,20 @@ watch(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ binding: (binding ?? '').trim() || 'openai', model: modelNameText.trim() }),
         })
-        if (autoModelKey.value === key && payload.defaults) autoDefaults.value = payload.defaults
+        if (autoRequestVersion === version && payload.defaults) autoDefaults.value = payload.defaults
       } catch {
         // Leave the Auto labels without a resolved value; overrides still work.
       }
     }, 250)
-    onCleanup(() => window.clearTimeout(handle))
+    onCleanup(() => { ++autoRequestVersion; window.clearTimeout(handle) })
   },
   { immediate: true },
 )
 
 function autoLabel(key: CapabilityKey): string {
   const value = autoDefaults.value?.[key]
-  if (value === undefined) return '自动'
-  return value ? '自动 · 支持' : '自动 · 不支持'
+  if (value === undefined) return tr('自动', 'Auto')
+  return value ? tr('自动 · 支持', 'Auto · Supported') : tr('自动 · 不支持', 'Auto · Not supported')
 }
 </script>
 
@@ -197,14 +208,14 @@ function autoLabel(key: CapabilityKey): string {
   <div v-if="model" class="model-fields-editor" :class="{ 'is-managed': managed }">
     <div class="model-fields-grid model-identity-grid">
       <label class="model-field">
-        <span class="model-field-label">显示名称</span>
-        <input type="text" :value="managed ? (model.user_name || model.name || '') : (model.name || '')" placeholder="模型显示名"
-               aria-label="模型显示名称" @input="update('name', ($event.target as HTMLInputElement).value)">
+        <span class="model-field-label">{{ tr('显示名称', 'Display name') }}</span>
+        <input type="text" :value="managed ? (model.user_name || model.name || '') : (model.name || '')" :placeholder="tr('模型显示名', 'Model display name')"
+               :aria-label="tr('模型显示名称', 'Model display name')" @input="update('name', ($event.target as HTMLInputElement).value)">
       </label>
       <label class="model-field">
-        <span class="model-field-label">模型 ID（提供方标识）</span>
-        <input type="text" :value="model.model || ''" :disabled="managed" placeholder="例如 gpt-4o"
-               aria-label="模型 ID" @input="update('model', ($event.target as HTMLInputElement).value)">
+        <span class="model-field-label">{{ tr('模型 ID（提供方标识）', 'Model ID (provider identifier)') }}</span>
+        <input type="text" :value="model.model || ''" :disabled="managed" :placeholder="tr('例如 gpt-4o', 'For example, gpt-4o')"
+               :aria-label="tr('模型 ID', 'Model ID')" @input="update('model', ($event.target as HTMLInputElement).value)">
       </label>
     </div>
     <!-- LLM-shaped services: context window, reasoning effort, capability overrides -->
@@ -212,32 +223,32 @@ function autoLabel(key: CapabilityKey): string {
       <div class="model-fields-grid">
         <label class="model-field">
           <span class="model-field-head">
-            <span class="model-field-label">上下文长度（tokens）</span>
-            <button type="button" class="model-field-link" :disabled="managed || !hasContextOverride" @click="resetContextWindow">使用默认值</button>
+            <span class="model-field-label">{{ tr('上下文长度（tokens）', 'Context window (tokens)') }}</span>
+            <button type="button" class="model-field-link" :disabled="managed || !hasContextOverride" @click="resetContextWindow">{{ tr('使用默认值', 'Use default') }}</button>
           </span>
-          <input type="number" min="1" :value="contextWindowValue" :disabled="managed" placeholder="默认"
-                 aria-label="上下文长度（tokens）" @input="update('context_window', ($event.target as HTMLInputElement).value)">
-          <small class="model-field-hint">保留默认、输入自定义值，或在连接测试后采用检测值；测试不会覆盖你的选择。</small>
+          <input type="number" min="1" :value="contextWindowValue" :disabled="managed" :placeholder="tr('默认', 'Default')"
+                 :aria-label="tr('上下文长度（tokens）', 'Context window (tokens)')" @input="update('context_window', ($event.target as HTMLInputElement).value)">
+          <small class="model-field-hint">{{ tr('保留默认、输入自定义值，或在连接测试后采用检测值；测试不会覆盖你的选择。', 'Keep the default, enter a custom value, or adopt a detected value after testing. Tests will not overwrite your choice.') }}</small>
         </label>
         <label class="model-field">
-          <span class="model-field-label">推理强度（Reasoning effort）</span>
-          <select :value="model.reasoning_effort || ''" :disabled="managed" aria-label="推理强度"
+          <span class="model-field-label">{{ tr('推理强度（Reasoning effort）', 'Reasoning effort') }}</span>
+          <select :value="model.reasoning_effort || ''" :aria-label="tr('推理强度', 'Reasoning effort')"
                   @change="update('reasoning_effort', ($event.target as HTMLSelectElement).value)">
-            <option value="">默认</option>
+            <option value="">{{ tr('默认', 'Default') }}</option>
             <option v-for="level in reasoningOptions" :key="level" :value="level">{{ level }}</option>
           </select>
         </label>
       </div>
       <details class="model-capabilities" :open="false">
-        <summary>模型能力</summary>
+        <summary>{{ tr('模型能力', 'Capabilities') }}</summary>
         <div class="model-capabilities-grid">
           <label v-for="row in CAPABILITY_ROWS" :key="row.key" class="model-field">
-            <span class="model-field-label">{{ row.label }}<small class="model-auto-hint">{{ autoLabel(row.key) }}</small></span>
-            <select :value="capabilityValue(row.key)" :disabled="managed" :aria-label="row.label"
+            <span class="model-field-label">{{ zh ? row.label : ({ tools: 'Tool calling', vision: 'Image input', json_output: 'JSON output', reasoning: 'Reasoning controls' }[row.key]) }}<small class="model-auto-hint">{{ autoLabel(row.key) }}</small></span>
+            <select :value="capabilityValue(row.key)" :disabled="managed" :aria-label="zh ? row.label : ({ tools: 'Tool calling', vision: 'Image input', json_output: 'JSON output', reasoning: 'Reasoning controls' }[row.key])"
                     @change="setCapability(row.key, ($event.target as HTMLSelectElement).value)">
               <option value="auto">{{ autoLabel(row.key) }}</option>
-              <option value="true">支持</option>
-              <option value="false">不支持</option>
+              <option value="true">{{ tr('支持', 'Supported') }}</option>
+              <option value="false">{{ tr('不支持', 'Not supported') }}</option>
             </select>
           </label>
         </div>
@@ -248,24 +259,24 @@ function autoLabel(key: CapabilityKey): string {
     <div v-if="extraFields.length" class="model-fields-grid">
       <label v-for="[field, label] in extraFields" :key="String(field)" class="model-field">
         <span class="model-field-label">{{ label }}</span>
-        <input type="text" :value="String(model[field as string] ?? '')" :disabled="managed" placeholder="默认"
+        <input type="text" :value="String(model[field as string] ?? '')" :disabled="managed" :placeholder="tr('默认', 'Default')"
                :aria-label="label" @input="update(field, ($event.target as HTMLInputElement).value)">
       </label>
     </div>
 
     <!-- Embedding-only: whether to send dimensions on requests -->
     <label v-if="service === 'embedding'" class="model-field model-field-block">
-      <span class="model-field-label">在嵌入请求中发送维度参数</span>
-      <select :value="sendDimensionsValue()" :disabled="managed" aria-label="在嵌入请求中发送维度参数"
+      <span class="model-field-label">{{ tr('在嵌入请求中发送维度参数', 'Send dimensions with embedding requests') }}</span>
+      <select :value="sendDimensionsValue()" :disabled="managed" :aria-label="tr('在嵌入请求中发送维度参数', 'Send dimensions with embedding requests')"
               @change="setSendDimensions(($event.target as HTMLSelectElement).value)">
-        <option value="auto">自动</option>
-        <option value="true">启用</option>
-        <option value="false">停用</option>
+        <option value="auto">{{ tr('自动', 'Auto') }}</option>
+        <option value="true">{{ tr('启用', 'Enabled') }}</option>
+        <option value="false">{{ tr('停用', 'Disabled') }}</option>
       </select>
     </label>
 
     <p v-if="managed" class="model-managed-note">
-      该登录提供方托管模型 ID、上下文与能力。你仍可以重命名模型并选择推理强度。
+      {{ tr('该登录提供方托管模型 ID、上下文与能力。你仍可以重命名模型并选择推理强度。', 'This signed-in provider manages the model ID, context window, and capabilities. You can still rename the model and choose its reasoning effort.') }}
     </p>
   </div>
 </template>

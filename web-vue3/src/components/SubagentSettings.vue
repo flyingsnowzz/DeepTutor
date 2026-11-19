@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { api, post } from '../api'
 
 interface ModelOption { slug: string; display_name: string; efforts?: string[] }
 interface BackendOptions { kind: string; display_name: string; available: boolean; version: string; detail: string; models: ModelOption[]; efforts: string[]; allow_custom_model: boolean }
-const props = defineProps<{ kind: string }>()
+const props = defineProps<{ kind: string; pending?: Record<string, any>; revision?: number }>()
+const emit = defineEmits<{ change: [value: Record<string, any>]; loaded: [value: Record<string, any>] }>()
 const options = ref<BackendOptions | null>(null)
 const config = reactive<Record<string, any>>({}) 
 const isAdmin = ref(false)
@@ -13,6 +14,7 @@ const busy = ref(false)
 const error = ref('')
 const notice = ref('')
 const customModel = ref(false)
+const hydrating = ref(false)
 const featureMap: Record<string, string[]> = {
   claude_code: ['effort', 'prompt', 'permission', 'images'],
   codex: ['effort', 'sandbox', 'images'],
@@ -45,13 +47,21 @@ async function load() {
       api<{ is_admin?: boolean }>('/api/auth/status'),
     ])
     options.value = optionResult.backends.find(item => item.kind === props.kind) || null
-    Object.assign(config, defaults(), settings.backends?.[props.kind] || {})
+    const live = { ...defaults(), ...(settings.backends?.[props.kind] || {}) }
+    emit('loaded', live)
+    hydrating.value = true
+    Object.assign(config, props.pending ?? live)
+    hydrating.value = false
     isAdmin.value = Boolean(auth.is_admin)
     customModel.value = Boolean(config.model && !options.value?.models.some(model => model.slug === config.model))
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '智能体设置加载失败' }
   finally { loading.value = false }
 }
 onMounted(load)
+watch(() => props.revision, () => { void load() })
+watch(config, () => {
+  if (!loading.value && !hydrating.value) emit('change', { ...config, extra_args: [...(config.extra_args || [])] })
+}, { deep: true, flush: 'sync' })
 async function sync() {
   busy.value = true
   error.value = ''
@@ -65,20 +75,6 @@ function chooseModel(value: string) {
   config.model = value
   const model = options.value?.models.find(item => item.slug === value)
   if (config.effort && model?.efforts?.length && !model.efforts.includes(config.effort)) config.effort = ''
-}
-async function save() {
-  busy.value = true
-  error.value = ''
-  notice.value = ''
-  try {
-    const result = await api<{ backends: Record<string, Record<string, any>> }>('/api/subagents/settings', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ backends: { [props.kind]: { ...config, extra_args: [...(config.extra_args || [])] } } }),
-    })
-    Object.assign(config, defaults(), result.backends?.[props.kind] || {})
-    notice.value = '智能体设置已保存'
-  } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' }
-  finally { busy.value = false }
 }
 </script>
 
@@ -102,7 +98,6 @@ async function save() {
         <label>额外命令行参数<input v-model="extraArgs" placeholder="以空格分隔"></label>
         <template v-if="kind === 'hermes_remote'"><label>网关 URL<input v-model="config.base_url" type="url"></label><label>密钥环境变量<input v-model="config.api_key_env"></label><label>配置 Profile<input v-model="config.profile"></label><label>空闲超时（秒）<input v-model.number="config.idle_timeout_seconds" type="number" min="1"></label></template>
       </fieldset>
-      <button class="primary" :disabled="!isAdmin || busy" @click="save">保存智能体设置</button>
     </template>
   </section>
 </template>

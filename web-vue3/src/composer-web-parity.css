@@ -1,0 +1,113 @@
+/* Keep the standard chat composer controls aligned with the React web UI. */
+.chat-shell:is(.is-new-conversation, .is-standard-conversation) .composer-resource-trigger {
+  box-sizing: border-box;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  justify-content: center;
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+  white-space: nowrap;
+  transition: width 180ms cubic-bezier(.2, 0, 0, 1), padding 180ms cubic-bezier(.2, 0, 0, 1), background-color 140ms, color 140ms;
+}
+
+.chat-shell:is(.is-new-conversation, .is-standard-conversation) .composer-resource-trigger > svg:first-child {
+  flex: 0 0 auto;
+}
+
+.chat-shell:is(.is-new-conversation, .is-standard-conversation) .composer-resource-trigger > span {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  white-space: nowrap;
+  transition: max-width 180ms cubic-bezier(.2, 0, 0, 1), opacity 120ms ease;
+}
+
+.chat-shell:is(.is-new-conversation, .is-standard-conversation) .composer-resource-trigger > svg:last-child {
+  width: 0;
+  flex: 0 0 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: width 180ms cubic-bezier(.2, 0, 0, 1), opacity 120ms ease;
+}
+
+.chat-shell:is(.is-new-conversation, .is-standard-conversation) .composer-resource-trigger:is(:hover, :focus-visible, [aria-expanded="true"]) {
+  width: auto;
+  padding-inline: 8px;
+  gap: 5px;
+}
+
+.chat-shell:is(.is-new-conversation, .is-standard-conversation) .composer-resource-trigger:is(:hover, :focus-visible, [aria-expanded="true"]) > span {
+  max-width: 5rem;
+  opacity: 1;
+}
+
+.chat-shell:is(.is-new-conversation, .is-standard-conversation) .composer-resource-trigger:is(:hover, :focus-visible, [aria-expanded="true"]) > svg:last-child {
+  width: 13px;
+  flex-basis: 13px;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-shell:is(.is-new-conversation, .is-standard-conversation) .composer-resource-trigger,
+  .chat-shell:is(.is-new-conversation, .is-standard-conversation) .composer-resource-trigger > span,
+  .chat-shell:is(.is-new-conversation, .is-standard-conversation) .composer-resource-trigger > svg:last-child {
+    transition: none;
+  }
+}
+
+/* Tray layer stacking, aligned with the React web composer.
+   React (web/features/ui-layout/modern/modern.css) keeps the tray free of a
+   z-index so it never creates a stacking context; the composer surface sits
+   at a low z-index (1) while the popovers carry their own (70). The popovers
+   therefore escape the tray and paint above the composer, while the tray's
+   own box (which tucks ~20px under the composer) stays below it — so the
+   composer's action buttons remain clickable.
+
+   Legacy Vue instead set chat-mode-bar z-index:25 while the composer is 30,
+   which trapped every tray popover behind the composer input. Resetting the
+   bar to z-index:auto removes the stacking context so the popovers' own
+   z-index (80/90) wins, exactly as React relies on. */
+.chat-shell:is(.is-new-conversation, .is-standard-conversation) .chat-mode-bar {
+  z-index: auto;
+}
+
+/* Lower the composer surface to z-index 1, matching the React web UI
+   (web/features/ui-layout/modern/modern.css). Popovers carry their own
+   z-index (80/90/100) and must escape above the composer; keeping the
+   composer at a low value lets every popover win without per-menu hacks.
+   The tray (chat-mode-bar, z-index:auto) still tucks 20px under the
+   composer and stays below it, so the composer's action buttons remain
+   clickable. */
+.chat-shell:is(.is-new-conversation, .is-standard-conversation) .composer {
+  z-index: 1;
+}
+
+/* New-conversation hero (empty-state) layout, aligned with React ChatWorkspace.
+   React renders the greeting inside a `flex-1 min-h-0 items-end overflow-hidden`
+   region that fills whatever space remains between the header and the composer,
+   so the title never collides with the composer. Legacy Vue instead hard-codes
+   height:312.25px / flex:0 1 312.25px on .conversation-transcript and
+   .message-list at >=768px; when the viewport is short, the flex-basis shrinks
+   (flex-shrink:1) while the composer stays fixed, so the bottom-aligned greeting
+   slides under the composer and its lower pixels get covered. Legacy also ships
+   a .chat-home-spacer that steals vertical space.
+
+   Drop the fixed height and the spacer so the transcript / message-list grow to
+   fill the available space, matching React's flex-1 min-h-0 behavior. */
+.chat-shell.is-new-conversation .conversation-transcript,
+.chat-shell.is-new-conversation .message-list {
+  height: auto;
+  max-height: none;
+  flex: 1 1 0%;
+  min-height: 0;
+}
+.chat-shell.is-new-conversation .chat-home-spacer {
+  height: 0;
+  flex: 0 0 0;
+  min-height: 0;
+}

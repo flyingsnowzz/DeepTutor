@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
+import { computed, onMounted } from 'vue'
+import { renderMarkdownProse } from '../mathMarkdown'
 import { parseMarkdownFences, type MarkdownSegment } from '../markdownFences'
 import MermaidBlock from './MermaidBlock.vue'
+import CodeBlockPreview from './CodeBlockPreview.vue'
+import { codeBlockPreferences, loadCodeBlockPreferences } from '../codeBlockPreferences'
 
 const props = withDefaults(defineProps<{ content: string; stripFrontmatter?: boolean }>(), { stripFrontmatter: false })
+onMounted(() => { void loadCodeBlockPreferences() })
 
 interface RenderedSegment {
   key: number
@@ -27,7 +29,7 @@ const segments = computed<RenderedSegment[]>(() => {
         key: index,
         type: 'prose' as const,
         isMermaid: false,
-        html: DOMPurify.sanitize(marked.parse(segment.text, { async: false, gfm: true, breaks: true })),
+        html: renderMarkdownProse(segment.text),
       }
     }
     const block = segment.block
@@ -41,15 +43,6 @@ const segments = computed<RenderedSegment[]>(() => {
       isMermaid: mermaid,
       code: block.code,
       language: block.lang,
-      html: mermaid
-        ? ''
-        : DOMPurify.sanitize(
-            marked.parse('```' + block.lang + '\n' + block.code + '\n```', {
-              async: false,
-              gfm: true,
-              breaks: true,
-            }),
-          ),
     }
   })
 })
@@ -60,7 +53,7 @@ const segments = computed<RenderedSegment[]>(() => {
     <template v-for="segment in segments" :key="segment.key">
       <div v-if="segment.type === 'prose'" v-html="segment.html" />
       <MermaidBlock v-else-if="segment.isMermaid" :code="segment.code || ''" :language="segment.language" />
-      <div v-else class="markdown-fenced-code" v-html="segment.html" />
+      <CodeBlockPreview v-else class="markdown-fenced-code" :raw="segment.code || ''" :language="segment.language || 'text'" :theme="codeBlockPreferences.theme" :show-line-numbers="codeBlockPreferences.showLineNumbers" :wrap-long-lines="codeBlockPreferences.wrapLongLines" />
     </template>
   </div>
 </template>

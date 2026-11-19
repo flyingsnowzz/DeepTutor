@@ -50,6 +50,9 @@ describe('CodexOAuthCard', () => {
     expect(wrapper.text()).toContain('已导入 2 个模型')
     expect(wrapper.find('select[aria-label="推理强度"]').exists()).toBe(true)
     expect(wrapper.find('button.primary').exists()).toBe(false)
+    await wrapper.find('select[aria-label="推理强度"]').setValue('high')
+    expect(wrapper.emitted('reasoningChanged')).toBeTruthy()
+    expect(auth.setCodexReasoningEffort).not.toHaveBeenCalled()
   })
 
   it('starts a local sign-in flow when disconnected', async () => {

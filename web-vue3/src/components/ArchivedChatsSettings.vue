@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { api } from '../api'
+import { sessionNavigationPath } from '../sessionNavigation'
+import { scopedUrl } from '../workspaceScope'
 import LegacyIcon from './LegacyIcon.vue'
 import {
   archiveCount,
@@ -22,6 +25,7 @@ const error = ref('')
 const busy = ref<string | null>(null)
 const query = ref('')
 const kind = ref<KindFilter>('all')
+const router = useRouter()
 
 const KIND_LABELS: Record<ArchiveKind, string> = {
   chat: '对话',
@@ -55,15 +59,26 @@ const visible = computed<ArchiveBuckets>(() => {
 
 const total = computed(() => archiveCount(buckets.value))
 const visibleCount = computed(() => archiveCount(visible.value))
-const visibleRows = computed<ArchivedConversation[]>(() => [
-  ...visible.value.chat,
-  ...visible.value.mastery,
-  ...visible.value.reading,
-])
+const groups = computed(() => (['chat', 'mastery', 'reading'] as const).map(key => ({ key, label: KIND_LABELS[key], rows: visible.value[key] })).filter(group => group.rows.length))
+function sessionWorkspace(row: SessionSummary) { return String(row.content_workspace_id ?? row.preferences?.workspace_id ?? '') }
+function sessionUrl(id: string, row: SessionSummary, suffix = '') { return scopedUrl(`/api/sessions/${encodeURIComponent(id)}${suffix}`, sessionWorkspace(row)) }
+async function listAllSessions() {
+  const result: SessionSummary[] = []
+  const seen = new Set<string>()
+  for (let offset = 0; ; offset += 200) {
+    const response = await api<{ sessions: SessionSummary[] }>(`/api/sessions?all_workspaces=true&limit=200&offset=${offset}`)
+    const page = response.sessions || []
+    for (const session of page) {
+      const key = `${sessionWorkspace(session)}:${session.session_id}`
+      if (!seen.has(key)) { seen.add(key); result.push(session) }
+    }
+    if (page.length < 200) return result
+  }
+}
 
 async function load() {
   const [sessionResult, topicResult, collectionResult] = await Promise.all([
-    api<{ sessions: SessionSummary[] }>('/api/sessions?all_workspaces=true&limit=200'),
+    listAllSessions(),
     api<{ topics?: LabeledItem[] }>('/api/mastery-paths/topics/index').catch(
       () => ({}) as { topics?: LabeledItem[] },
     ),
@@ -71,7 +86,7 @@ async function load() {
       () => ({}) as { collections?: LabeledItem[] },
     ),
   ])
-  sessions.value = sessionResult.sessions || []
+  sessions.value = sessionResult
   topics.value = (topicResult.topics || []).map(item => { const row = item as unknown as Record<string, unknown>; return { id: String(item.id || row.path_id || ''), name: item.name } })
   collections.value = (collectionResult.collections || []).map(item => { const row = item as unknown as Record<string, unknown>; return { id: String(item.id || row.workspace_id || ''), title: item.title } })
 }
@@ -104,7 +119,7 @@ async function mutate(id: string, operation: () => Promise<void>) {
 
 function restore(row: ArchivedConversation) {
   return mutate(`restore:${row.session.session_id}`, () =>
-    api(`/api/sessions/${encodeURIComponent(row.session.session_id)}/organization`, {
+    api(sessionUrl(row.session.session_id, row.session, '/organization'), {
       method: 'PATCH',
       body: JSON.stringify({ archived: false }),
     }),
@@ -114,21 +129,20 @@ function restore(row: ArchivedConversation) {
 function remove(row: ArchivedConversation) {
   if (!window.confirm('永久删除此对话及其辅导线程？此操作无法撤销。')) return
   return mutate(`delete:${row.session.session_id}`, () =>
-    api(`/api/sessions/${encodeURIComponent(row.session.session_id)}`, { method: 'DELETE' }),
+    api(sessionUrl(row.session.session_id, row.session), { method: 'DELETE' }),
   )
 }
 
 function deleteAll() {
-  const ids = [...buckets.value.chat, ...buckets.value.mastery, ...buckets.value.reading].map(
-    row => row.session.session_id,
-  )
-  if (!window.confirm(`永久删除全部 ${ids.length} 个已归档对话及其辅导线程？此操作无法撤销。`)) return
+  const rows = [...buckets.value.chat, ...buckets.value.mastery, ...buckets.value.reading]
+  if (!window.confirm(`永久删除全部 ${rows.length} 个已归档对话及其辅导线程？此操作无法撤销。`)) return
   return mutate('all', async () => {
-    for (const id of ids) {
-      await api(`/api/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' })
+    for (const row of rows) {
+      await api(sessionUrl(row.session.session_id, row.session), { method: 'DELETE' })
     }
   })
 }
+function open(row: ArchivedConversation) { void router.push(sessionNavigationPath({ id: row.session.session_id, content_workspace_id: sessionWorkspace(row.session), preferences: row.session.preferences })) }
 
 onMounted(refresh)
 </script>
@@ -165,22 +179,21 @@ onMounted(refresh)
     <p v-if="loading" class="archived-loading">加载中…</p>
     <p v-else-if="total > 0 && visibleCount === 0" class="archived-empty">没有匹配搜索条件的已归档对话。</p>
 
-    <ul v-else-if="visibleRows.length" class="archived-list">
-      <li v-for="row in visibleRows" :key="row.session.session_id" class="archived-row">
-        <div class="archived-row-main">
-          <span class="archived-row-kind">{{ KIND_LABELS[row.kind] }}</span>
-          <strong>{{ row.session.title || '未命名对话' }}</strong>
-          <small v-if="row.container" class="archived-container">{{ row.container }}</small>
-        </div>
-        <div class="archived-row-actions">
-          <button type="button" :disabled="busy === `restore:${row.session.session_id}`" @click="restore(row)">
-            <LegacyIcon name="history" :size="14" />取消归档
-          </button>
-          <button type="button" class="archived-danger" :disabled="busy === `delete:${row.session.session_id}`" @click="remove(row)">
-            <LegacyIcon name="trash" :size="14" />删除
-          </button>
-        </div>
-      </li>
-    </ul>
+    <div v-else class="archived-groups">
+      <p class="archived-intro">归档只会将对话从侧栏移除，不会删除内容。取消归档后，对话会回到原来的位置。</p>
+      <section v-for="group in groups" :key="group.key" class="archived-group">
+        <h2><LegacyIcon :name="group.key === 'chat' ? 'chat' : group.key === 'mastery' ? 'route' : 'book'" :size="13" />{{ group.label }} <span>{{ group.rows.length }}</span></h2>
+        <ul class="archived-list">
+          <li v-for="row in group.rows" :key="row.session.session_id" class="archived-row">
+            <button type="button" class="archived-row-main" :disabled="Boolean(busy)" @click="open(row)"><strong>{{ row.session.title || '新对话' }}</strong><small>{{ row.container }}</small></button>
+            <div class="archived-row-actions">
+              <button type="button" class="archived-danger" :disabled="Boolean(busy)" aria-label="永久删除" @click="remove(row)"><LegacyIcon name="trash" :size="15" /></button>
+              <button type="button" :disabled="Boolean(busy)" @click="restore(row)"><LegacyIcon name="history" :size="13" />取消归档</button>
+            </div>
+          </li>
+        </ul>
+      </section>
+      <p v-if="!total && !error" class="archived-empty">还没有归档对话。</p>
+    </div>
   </div>
 </template>

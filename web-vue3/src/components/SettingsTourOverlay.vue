@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import LegacyIcon from './LegacyIcon.vue'
 import { nextTourIndex, previousTourIndex, tourStepAt } from '../settingsTour'
 
-const props = defineProps<{ stepIndex: number }>()
+const props = defineProps<{ stepIndex: number; language?: string }>()
 const emit = defineEmits<{ close: []; 'update:stepIndex': [index: number] }>()
 const route = useRoute()
 const router = useRouter()
@@ -14,6 +14,17 @@ let frame = 0
 let attempts = 0
 
 const step = computed(() => tourStepAt(props.stepIndex))
+const chinese = computed(() => (props.language || 'zh').toLowerCase().startsWith('zh'))
+const tr = (zh: string, en: string) => chinese.value ? zh : en
+const englishSteps: Record<string, { title: string; description: string }> = {
+  '/settings/status': { title: 'Status', description: 'Check backend availability, memory use, and which services are ready on this page.' },
+  '/settings/appearance': { title: 'Appearance', description: 'Visual theme and code-block styling. Apply changes to use them across the app.' },
+  '/settings/network': { title: 'Network', description: 'Ports, the browser-facing API base, and CORS origins for Docker, LAN, and reverse-proxy deployments.' },
+  '/settings/llm': { title: 'Models', description: 'Choose models by purpose. Service connections hold reusable credentials; model assignment chooses what each task uses.' },
+  '/settings/knowledge': { title: 'Knowledge Base', description: 'Choose the document parsing engine that turns uploads into text.' },
+  '/settings/starters': { title: 'Chat', description: 'Adjust home suggestions and response timeouts. Tools and learning capabilities have their own pages in the sidebar.' },
+  '/settings/memory': { title: 'Memory', description: 'Tune the memory consolidator: chunking, LLM budgets, dedup, and reference policies.' },
+}
 const last = computed(() => props.stepIndex >= 0 && props.stepIndex === 6)
 const hole = computed(() => {
   if (!rect.value) return null
@@ -120,10 +131,10 @@ onUnmounted(() => {
     <div class="settings-tour-highlight" :style="{ left: `${hole.left}px`, top: `${hole.top}px`, width: `${hole.width}px`, height: `${hole.height}px` }" />
     <section class="settings-tour-tooltip" role="dialog" aria-modal="false" aria-labelledby="settings-tour-title" :style="{ left: `${tooltip.left}px`, top: `${tooltip.top}px` }">
       <div class="settings-tour-progress"><i :style="{ width: `${((stepIndex + 1) / 7) * 100}%` }" /></div>
-      <header><span><LegacyIcon name="sparkles" :size="13" />第 {{ stepIndex + 1 }} / 7 步</span><button type="button" aria-label="跳过设置引导" @click="emit('close')"><LegacyIcon name="close" :size="14" /></button></header>
-      <h2 id="settings-tour-title">{{ step.title }}</h2>
-      <p>{{ step.description }}</p>
-      <footer><button type="button" :disabled="stepIndex === 0" @click="back"><LegacyIcon name="chevronLeft" :size="13" />上一步</button><button type="button" class="settings-tour-skip" @click="emit('close')">跳过引导</button><button type="button" class="primary" @click="advance">{{ last ? '完成' : '下一步' }}<LegacyIcon name="chevronRight" :size="13" /></button></footer>
+      <header><span><LegacyIcon name="sparkles" :size="13" />{{ tr(`第 ${stepIndex + 1} / 7 步`, `Step ${stepIndex + 1} of 7`) }}</span><button type="button" :aria-label="tr('跳过设置引导', 'Skip tour')" @click="emit('close')"><LegacyIcon name="close" :size="14" /></button></header>
+      <h2 id="settings-tour-title">{{ chinese ? step.title : englishSteps[step.route]?.title || step.title }}</h2>
+      <p>{{ chinese ? step.description : englishSteps[step.route]?.description || step.description }}</p>
+      <footer><button type="button" :disabled="stepIndex === 0" @click="back"><LegacyIcon name="chevronLeft" :size="13" />{{ tr('上一步', 'Back') }}</button><button type="button" class="settings-tour-skip" @click="emit('close')">{{ tr('跳过引导', 'Skip tour') }}</button><button type="button" class="primary" @click="advance">{{ last ? tr('完成', 'Got it') : tr('下一步', 'Next') }}<LegacyIcon name="chevronRight" :size="13" /></button></footer>
     </section>
   </div>
 </template>
